@@ -34,9 +34,13 @@ public class UserService {
     // ======================
     public UserResponseDTO create(UserCreateDTO dto) {
 
-        if (userRepository.existsByEmail(dto.email())) {
-            throw new ConflictException("Email já cadastrado");
-        }
+        userRepository.findByEmail(dto.email()).ifPresent(user -> {
+            if (user.isActive()) {
+                throw new ConflictException("Email já cadastrado");
+            } else {
+                throw new ConflictException("Existe uma conta desativada com este email");
+            }
+        });
 
         User user = new User(
                 dto.name(),

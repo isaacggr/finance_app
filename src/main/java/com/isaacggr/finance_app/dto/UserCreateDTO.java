@@ -6,15 +6,15 @@ import jakarta.validation.constraints.Size;
 
 public record UserCreateDTO(
 
-        @NotBlank
-        @Size(min = 2, max = 50)
+        @NotBlank(message = "O nome é obrigatório")
+        @Size(min = 2, max = 50, message = "O nome deve ter entre 2 e 50 caracteres")
         String name,
 
-        @Email
-        @NotBlank
+        @Email(message = "Formato de e-mail inválido")
+        @NotBlank(message = "O e-mail é obrigatório")
         String email,
 
-        @NotBlank
-        @Size(min = 8, max = 64)
+        @NotBlank(message = "A senha é obrigatória")
+        @Size(min = 8, max = 64, message = "A senha deve ter entre 8 e 64 caracteres")
         String password
 ) {}

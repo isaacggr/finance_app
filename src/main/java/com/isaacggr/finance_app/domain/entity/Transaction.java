@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -46,6 +47,12 @@ public class Transaction {
     @Column(nullable = false)
     private boolean deleted;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
     // =========================
     // CONSTRUTOR
     // =========================
@@ -64,6 +71,21 @@ public class Transaction {
         this.date = date;
         this.description = description;
         this.deleted = false;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 
     // =========================
@@ -81,6 +103,10 @@ public class Transaction {
         this.category = category;
         this.date = date;
         this.description = description;
+    }
+
+    public boolean isDeleted() {
+        return this.deleted;
     }
 
     public void markAsDeleted() {

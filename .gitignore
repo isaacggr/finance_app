@@ -33,9 +33,18 @@ build/
 .vscode/
 
 # Spring Boot
-application.yaml
-application.yml
+/application.yaml
+/application.yml
+!src/main/resources/application.yaml
+!src/test/resources/application.yaml
 
 # Profiles locais
 application-local.yaml
 application-dev.yaml
+
+# Variáveis de ambiente
+.env
+!.env.example
+
+# Configuração e diretrizes locais do assistente
+GEMINI.md
