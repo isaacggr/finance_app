@@ -7,8 +7,10 @@ import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
+import com.isaacggr.finance_app.repository.specification.TransactionSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,12 +74,35 @@ public class TransactionService {
     }
 
     // ======================
-    // LIST (Transações do Usuário Autenticado)
+    // LIST (Transações do Usuário Autenticado com Filtros Dinâmicos)
     // ======================
     @Transactional(readOnly = true)
+    public Page<Transaction> listByUser(
+            UUID userId,
+            LocalDate startDate,
+            LocalDate endDate,
+            TransactionCategory category,
+            TransactionType type,
+            Pageable pageable
+    ) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ConflictException("A data inicial não pode ser posterior à data final");
+        }
+
+        Specification<Transaction> spec = TransactionSpecification.withFilters(
+                userId,
+                startDate,
+                endDate,
+                category,
+                type
+        );
+
+        return transactionRepository.findAll(spec, pageable);
+    }
+
+    @Transactional(readOnly = true)
     public Page<Transaction> listByUser(UUID userId, Pageable pageable) {
-        return transactionRepository
-                .findByUserIdAndDeletedFalse(userId, pageable);
+        return listByUser(userId, null, null, null, null, pageable);
     }
 
     // ======================

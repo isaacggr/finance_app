@@ -18,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -28,6 +29,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -158,13 +160,50 @@ class TransactionServiceTest {
     @DisplayName("Deve listar transações do usuário de forma paginada")
     void listByUser_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findByUserIdAndDeletedFalse(userId, pageable))
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(userId, pageable);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    @DisplayName("Deve listar transações com filtros de período, categoria e tipo")
+    void listByUser_WithFilters_Success() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
+
+        Page<Transaction> result = transactionService.listByUser(
+                userId,
+                LocalDate.now().minusDays(5),
+                LocalDate.now(),
+                TransactionCategory.ALIMENTACAO,
+                TransactionType.EXPENSE,
+                pageable
+        );
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    @DisplayName("Deve lançar ConflictException quando data inicial for posterior à data final no filtro")
+    void listByUser_ThrowsConflict_WhenStartDateIsAfterEndDate() {
+        Pageable pageable = PageRequest.of(0, 10);
+        LocalDate start = LocalDate.now();
+        LocalDate end = LocalDate.now().minusDays(1);
+
+        assertThrows(ConflictException.class, () -> transactionService.listByUser(
+                userId,
+                start,
+                end,
+                null,
+                null,
+                pageable
+        ));
     }
 
     @Test

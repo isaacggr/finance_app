@@ -14,7 +14,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", indexes = {
+        @Index(name = "idx_transactions_user_date", columnList = "user_id, date"),
+        @Index(name = "idx_transactions_user_deleted", columnList = "user_id, deleted")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Transaction {

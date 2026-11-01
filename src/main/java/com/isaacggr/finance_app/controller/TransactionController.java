@@ -2,6 +2,8 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.enums.TransactionCategory;
+import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.PageResponseDTO;
 import com.isaacggr.finance_app.dto.TransactionCreateDTO;
 import com.isaacggr.finance_app.dto.TransactionResponseDTO;
@@ -18,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -52,15 +55,19 @@ public class TransactionController {
                 .body(TransactionResponseDTO.fromEntity(transaction));
     }
 
-    // ✅ Listar transações do usuário autenticado (paginadas)
+    // ✅ Listar transações do usuário autenticado (paginadas e com filtros opcionais)
     @GetMapping
-    @Operation(summary = "Listar transações", description = "Lista as transações do usuário autenticado com paginação")
+    @Operation(summary = "Listar transações", description = "Lista as transações do usuário autenticado com paginação e filtros opcionais por período, categoria e tipo")
     public ResponseEntity<PageResponseDTO<TransactionResponseDTO>> list(
+            @RequestParam(required = false) @Parameter(description = "Data inicial (AAAA-MM-DD)", example = "2026-11-01") LocalDate startDate,
+            @RequestParam(required = false) @Parameter(description = "Data final (AAAA-MM-DD)", example = "2026-11-30") LocalDate endDate,
+            @RequestParam(required = false) @Parameter(description = "Categoria da transação", example = "ALIMENTACAO") TransactionCategory category,
+            @RequestParam(required = false) @Parameter(description = "Tipo da transação (INCOME ou EXPENSE)", example = "EXPENSE") TransactionType type,
             @AuthenticationPrincipal User user,
             Pageable pageable
     ) {
         Page<TransactionResponseDTO> page = transactionService
-                .listByUser(user.getId(), pageable)
+                .listByUser(user.getId(), startDate, endDate, category, type, pageable)
                 .map(TransactionResponseDTO::fromEntity);
 
         return ResponseEntity.ok(PageResponseDTO.from(page));
