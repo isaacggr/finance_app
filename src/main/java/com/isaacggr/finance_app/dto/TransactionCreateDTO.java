@@ -9,12 +9,8 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
 
 public record TransactionCreateDTO(
-
-        @NotNull(message = "O ID do usuário é obrigatório")
-        UUID userId,
 
         @NotNull(message = "O valor da transação é obrigatório")
         @Positive(message = "O valor da transação deve ser positivo")

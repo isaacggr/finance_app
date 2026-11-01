@@ -7,7 +7,6 @@ import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
-import com.isaacggr.finance_app.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -36,9 +36,6 @@ class TransactionServiceTest {
     @Mock
     private TransactionRepository transactionRepository;
 
-    @Mock
-    private UserRepository userRepository;
-
     @InjectMocks
     private TransactionService transactionService;
 
@@ -53,6 +50,8 @@ class TransactionServiceTest {
         transactionId = UUID.randomUUID();
 
         sampleUser = new User("Isaac Gregorio", "isaac@example.com", "pass1234");
+        ReflectionTestUtils.setField(sampleUser, "id", userId);
+
         sampleTransaction = new Transaction(
                 sampleUser,
                 new BigDecimal("150.00"),
@@ -61,16 +60,16 @@ class TransactionServiceTest {
                 LocalDate.now(),
                 "Almoço de negócios"
         );
+        ReflectionTestUtils.setField(sampleTransaction, "id", transactionId);
     }
 
     @Test
-    @DisplayName("Deve criar transação com sucesso para usuário ativo e dados válidos")
+    @DisplayName("Deve criar transação com sucesso para usuário autenticado ativo e dados válidos")
     void create_Success() {
-        when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
         when(transactionRepository.save(any(Transaction.class))).thenReturn(sampleTransaction);
 
         Transaction created = transactionService.create(
-                userId,
+                sampleUser,
                 new BigDecimal("150.00"),
                 TransactionType.EXPENSE,
                 TransactionCategory.ALIMENTACAO,
@@ -85,12 +84,10 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar NotFoundException ao tentar criar transação para usuário inexistente")
-    void create_ThrowsNotFoundException_WhenUserNotFound() {
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
+    @DisplayName("Deve lançar NotFoundException ao tentar criar transação quando usuário for nulo")
+    void create_ThrowsNotFoundException_WhenUserIsNull() {
         assertThrows(NotFoundException.class, () -> transactionService.create(
-                userId,
+                null,
                 new BigDecimal("100.00"),
                 TransactionType.INCOME,
                 TransactionCategory.OUTROS,
@@ -100,13 +97,12 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar ConflictException ao tentar criar transação para usuário desativado")
-    void create_ThrowsConflictException_WhenUserIsDeleted() {
+    @DisplayName("Deve lançar NotFoundException ao tentar criar transação para usuário inativo")
+    void create_ThrowsNotFoundException_WhenUserIsDeleted() {
         sampleUser.markAsDeleted();
-        when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
 
-        assertThrows(ConflictException.class, () -> transactionService.create(
-                userId,
+        assertThrows(NotFoundException.class, () -> transactionService.create(
+                sampleUser,
                 new BigDecimal("100.00"),
                 TransactionType.INCOME,
                 TransactionCategory.OUTROS,
@@ -118,10 +114,8 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar ConflictException quando o valor da transação for menor ou igual a zero")
     void create_ThrowsConflictException_WhenAmountIsZeroOrNegative() {
-        when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
-
         assertThrows(ConflictException.class, () -> transactionService.create(
-                userId,
+                sampleUser,
                 BigDecimal.ZERO,
                 TransactionType.INCOME,
                 TransactionCategory.OUTROS,
@@ -130,7 +124,7 @@ class TransactionServiceTest {
         ));
 
         assertThrows(ConflictException.class, () -> transactionService.create(
-                userId,
+                sampleUser,
                 new BigDecimal("-50.00"),
                 TransactionType.EXPENSE,
                 TransactionCategory.ALIMENTACAO,
@@ -140,30 +134,31 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve buscar uma transação ativa por ID com sucesso")
+    @DisplayName("Deve buscar uma transação ativa por ID garantindo pertencimento ao usuário")
     void findById_Success() {
-        when(transactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(sampleTransaction));
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.of(sampleTransaction));
 
-        Transaction found = transactionService.findById(transactionId);
+        Transaction found = transactionService.findById(transactionId, userId);
 
         assertNotNull(found);
         assertEquals(sampleTransaction.getAmount(), found.getAmount());
     }
 
     @Test
-    @DisplayName("Deve lançar NotFoundException quando a transação não existir")
-    void findById_ThrowsNotFoundException() {
-        when(transactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.empty());
+    @DisplayName("Deve lançar NotFoundException quando a transação não existir ou pertencer a outro usuário")
+    void findById_ThrowsNotFoundException_WhenNotFoundOrBelongsToAnotherUser() {
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> transactionService.findById(transactionId));
+        assertThrows(NotFoundException.class, () -> transactionService.findById(transactionId, userId));
     }
 
     @Test
     @DisplayName("Deve listar transações do usuário de forma paginada")
     void listByUser_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(userRepository.findById(userId)).thenReturn(Optional.of(sampleUser));
-        when(transactionRepository.findByUserIdAndDeletedFalse(any(), eq(pageable)))
+        when(transactionRepository.findByUserIdAndDeletedFalse(userId, pageable))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(userId, pageable);
@@ -173,13 +168,13 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve marcar transação como deletada com sucesso")
+    @DisplayName("Deve marcar transação do usuário como deletada com sucesso")
     void delete_Success() {
-        when(transactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(sampleTransaction));
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.of(sampleTransaction));
 
-        transactionService.delete(transactionId);
+        transactionService.delete(transactionId, userId);
 
         assertTrue(sampleTransaction.isDeleted());
     }
 }
-

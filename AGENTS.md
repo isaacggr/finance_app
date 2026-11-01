@@ -25,3 +25,4 @@ A aplicação segue uma arquitetura em camadas estritas:
 - **Tratamento de Exceções:** Erros de negócio devem lançar exceções tratadas pelo `GlobalExceptionHandler`.
 - **Testes:** Manter a suíte de testes (`./mvnw test`) sempre verde após qualquer alteração.
 - **Comunicação:** Manter comentários de código e respostas ao usuário em Português (pt-BR).
+

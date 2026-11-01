@@ -7,8 +7,6 @@ import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
-import com.isaacggr.finance_app.repository.UserRepository;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,100 +21,70 @@ import java.util.UUID;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
-    private final UserRepository userRepository;
 
-    public TransactionService(
-            TransactionRepository transactionRepository,
-            UserRepository userRepository) {
+    public TransactionService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
-        this.userRepository = userRepository;
     }
 
     // ======================
-    // CREATE
+    // CREATE (Associado ao Usuário Autenticado)
     // ======================
     public Transaction create(
-        UUID userId,
-        BigDecimal amount,
-        TransactionType type,
-        TransactionCategory category,
-        LocalDate date,
-        String description
-) {
-    User user = findActiveUser(userId);
-
-    // ✅ REGRA NO SERVICE
-    if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-        throw new ConflictException("Valor da transação deve ser maior que zero");
-    }
-
-    if (date == null) {
-        throw new ConflictException("Data da transação é obrigatória");
-    }
-
-    Transaction transaction = new Transaction(
-            user,
-            amount,
-            type,
-            category,
-            date,
-            description
-    );
-
-    return transactionRepository.save(transaction);
-}
-
-
-    // ======================
-    // FIND BY ID
-    // ======================
-    @Transactional(readOnly = true)
-    public Transaction findById(UUID transactionId) {
-        return findActiveTransaction(transactionId);
-    }
-
-    // ======================
-    // LIST (paginated)
-    // ======================
-    @Transactional(readOnly = true)
-    public Page<Transaction> listByUser(UUID userId, Pageable pageable) {
-        User user = findActiveUser(userId);
-
-        return transactionRepository
-                .findByUserIdAndDeletedFalse(user.getId(), pageable);
-    }
-
-    // ======================
-    // DELETE (soft)
-    // ======================
-    public void delete(UUID transactionId) {
-        Transaction transaction = findActiveTransaction(transactionId);
-
-        if (transaction.isDeleted()) {
-            throw new ConflictException("Transação já foi deletada");
+            User user,
+            BigDecimal amount,
+            TransactionType type,
+            TransactionCategory category,
+            LocalDate date,
+            String description
+    ) {
+        if (user == null || !user.isActive()) {
+            throw new NotFoundException("Usuário não encontrado");
         }
 
-        transaction.markAsDeleted();
-    }
-
-    // ======================
-    // MÉTODOS PRIVADOS
-    // ======================
-    private User findActiveUser(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Usuário não encontrado"));
-
-        if (user.isDeleted()) {
-            throw new ConflictException("Usuário está deletado");
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ConflictException("Valor da transação deve ser maior que zero");
         }
 
-        return user;
+        if (date == null) {
+            throw new ConflictException("Data da transação é obrigatória");
+        }
+
+        Transaction transaction = new Transaction(
+                user,
+                amount,
+                type,
+                category,
+                date,
+                description
+        );
+
+        return transactionRepository.save(transaction);
     }
 
-    private Transaction findActiveTransaction(UUID transactionId) {
+    // ======================
+    // FIND BY ID (Garante que a transação pertence ao usuário)
+    // ======================
+    @Transactional(readOnly = true)
+    public Transaction findById(UUID transactionId, UUID userId) {
         return transactionRepository
-                .findByIdAndDeletedFalse(transactionId)
+                .findByIdAndUserIdAndDeletedFalse(transactionId, userId)
                 .orElseThrow(() -> new NotFoundException("Transação não encontrada"));
     }
 
+    // ======================
+    // LIST (Transações do Usuário Autenticado)
+    // ======================
+    @Transactional(readOnly = true)
+    public Page<Transaction> listByUser(UUID userId, Pageable pageable) {
+        return transactionRepository
+                .findByUserIdAndDeletedFalse(userId, pageable);
+    }
+
+    // ======================
+    // DELETE (Soft delete da transação do usuário)
+    // ======================
+    public void delete(UUID transactionId, UUID userId) {
+        Transaction transaction = findById(transactionId, userId);
+        transaction.markAsDeleted();
+    }
 }

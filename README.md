@@ -6,9 +6,11 @@
 
 [![Java 21](https://img.shields.io/badge/Java-21%20LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Security](https://img.shields.io/badge/Spring%20Security-JWT-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)
+[![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203.1-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](http://localhost:8080/swagger-ui.html)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-17%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-25%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -17,6 +19,7 @@
   <a href="#-sobre-a-aplicação">Sobre</a> •
   <a href="#-arquitetura-em-camadas">Arquitetura</a> •
   <a href="#-como-executar">Como Executar</a> •
+  <a href="#-documentação-interativa-swagger">Swagger</a> •
   <a href="#-endpoints-da-api">Endpoints</a> •
   <a href="#-testes-automatizados">Testes</a> •
   <a href="#-autor">Autor</a>
@@ -28,46 +31,53 @@
 
 ## 🎯 Sobre a Aplicação
 
-O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoal através de uma API simples, rápida e segura.
+O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoal através de uma API robusta, escalável e segura.
 
-### ✨ Como a aplicação funciona:
+### ✨ Principais Recursos e Decisões de Engenharia:
 
-* **👤 Gestão de Usuários:** Cadastro completo com validação de dados e senha criptografada com **BCrypt**.
+* **🔐 Autenticação Stateless (JWT):** Sessões stateless gerenciadas via tokens JWT assinados com algoritmo **HMAC-SHA256**, lendo chave secreta e expiração de variáveis de ambiente.
+* **🛡️ Eliminação Estrita de IDOR (OWASP):** As rotas de transações **nunca** recebem `userId` no corpo ou na URL. O usuário autenticado é extraído diretamente do contexto de segurança (`SecurityContextHolder`), garantindo isolamento total de dados entre contas.
+* **👤 Gestão de Usuários:** Cadastro com validação de formato e senhas criptografadas com **BCrypt**.
 * **💳 Gestão de Transações:** Registro de receitas (`INCOME`) e despesas (`EXPENSE`) organizadas por categorias (alimentação, moradia, transporte, lazer, etc.).
-* **📄 Extrato Paginado:** Consulta otimizada das transações financeiras de um usuário, com suporte a paginação e ordenação por data.
-* **🛡️ Exclusão Lógica (*Soft Delete*):** Usuários e transações não são excluídos fisicamente do banco de dados; uma flag de inativação preserva a integridade do histórico financeiro.
-* **⏱️ Auditoria Automática:** Todas as entidades registram automaticamente carimbos de data/hora de criação (`created_at`) e última atualização (`updated_at`).
+* **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
+* **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
+* **⏱️ Auditoria Automática:** Preenchimento automático de data/hora de criação (`created_at`) e atualização (`updated_at`) via ciclo de vida JPA (`@PrePersist` e `@PreUpdate`).
 
 ---
 
 ## 🏛️ Arquitetura em Camadas
 
-O projeto foi estruturado seguindo o padrão de **Arquitetura em Camadas (Layered Architecture)**, garantindo separação clara de responsabilidades, testabilidade e manutenibilidade:
+O projeto segue os princípios de **Clean Code**, **SOLID** e **Arquitetura em Camadas (Layered Architecture)**:
 
 ```text
                ┌────────────────────────────────────────────────────────┐
                │                  Cliente / Requisição                  │
                └───────────────────────────┬────────────────────────────┘
-                                           │ HTTP / JSON
+                                           │ HTTP / JSON (Bearer Token)
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  1. Controller Layer                                                                   │
-│  • Mapeamento de rotas REST e validação de contratos de entrada via DTOs (Records)     │
+│  1. Security & Filter Layer                                                            │
+│  • Validação de Token JWT (OncePerRequestFilter) e injeção no SecurityContextHolder    │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  2. Service Layer                                                                      │
-│  • Regras de negócio, validações financeiras, segurança (BCrypt) e controle de estado │
+│  2. Controller Layer                                                                   │
+│  • Mapeamento REST, validação Bean Validation (@Valid) e injeção do @AuthenticationPrincipal │
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  3. Repository Layer                                                                   │
-│  • Abstração de persistência com Spring Data JPA, paginação e consultas de soft delete │
+│  3. Service Layer                                                                      │
+│  • 100% das regras de negócio, controle transacional (@Transactional) e regras de domínio│
 └──────────────────────────────────────────┬─────────────────────────────────────────────┘
                                            ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  4. Database Layer (Docker)                                                            │
-│  • Banco de dados relacional MySQL 8.0 conteinerizado com persistência em volume       │
+│  4. Repository Layer                                                                   │
+│  • Spring Data JPA com consultas filtradas por usuário autenticado e soft delete       │
+└──────────────────────────────────────────┬─────────────────────────────────────────────┘
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  5. Database Layer (Docker)                                                            │
+│  • MySQL 8.0 conteinerizado, desacoplado via .env e persistido em volume local          │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -79,11 +89,20 @@ O projeto foi estruturado seguindo o padrão de **Arquitetura em Camadas (Layere
 * **Java 21**
 * **Docker & Docker Compose**
 
+### Passo a passo
+
 ```bash
-# 1. Inicie o banco de dados MySQL no Docker
+# 1. Clone o repositório
+git clone https://github.com/isaacggr/finance_app.git
+cd finance_app
+
+# 2. Configure o arquivo de variáveis de ambiente
+cp .env.example .env
+
+# 3. Inicie o banco de dados MySQL via Docker Compose
 docker compose up -d
 
-# 2. Inicie a aplicação Spring Boot
+# 4. Inicie a aplicação Spring Boot
 ./mvnw spring-boot:run
 ```
 
@@ -91,39 +110,65 @@ docker compose up -d
 
 ---
 
+## 📖 Documentação Interativa (Swagger)
+
+A API possui documentação viva e interativa baseada na especificação **OpenAPI 3.1**:
+
+* Acesse a interface Swagger UI: **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+* Para testar rotas protegidas: faça login em `POST /auth/login`, copie o token e use o botão **"Authorize 🔓"**.
+
+---
+
 ## 🧭 Endpoints da API
+
+### 🔐 Autenticação (`/auth`)
+
+| Verbo | Rota | Autenticado? | Descrição |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/auth/login` | Não | Autentica o usuário com e-mail/senha e retorna o token JWT Bearer |
+
+---
 
 ### 👤 Usuários (`/users`)
 
-| Verbo | Rota | Descrição |
-| :---: | :--- | :--- |
-| `POST` | `/users` | Cadastra um novo usuário com senha criptografada |
-| `GET` | `/users/{id}` | Busca os dados do usuário por ID |
-| `DELETE` | `/users/{id}` | Realiza a exclusão lógica (*soft delete*) do usuário |
+| Verbo | Rota | Autenticado? | Descrição |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/users` | Não | Cadastra um novo usuário com senha criptografada via BCrypt |
+| `GET` | `/users/{id}` | 🔒 Sim | Busca os dados públicos do usuário por ID |
+| `DELETE` | `/users/{id}` | 🔒 Sim | Realiza a exclusão lógica (*soft delete*) do usuário |
 
 ---
 
 ### 💳 Transações (`/transactions`)
 
-| Verbo | Rota | Descrição |
-| :---: | :--- | :--- |
-| `POST` | `/transactions` | Cria uma nova receita (`INCOME`) ou despesa (`EXPENSE`) |
-| `GET` | `/transactions/{id}` | Busca os detalhes de uma transação por ID |
-| `GET` | `/transactions/user/{userId}` | Lista transações ativas de um usuário com paginação |
-| `DELETE` | `/transactions/{id}` | Realiza a exclusão lógica (*soft delete*) da transação |
+> 🔒 *Todas as operações de transação são estritamente associadas ao usuário autenticado.*
+
+| Verbo | Rota | Autenticado? | Descrição |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/transactions` | 🔒 Sim | Cria uma receita (`INCOME`) ou despesa (`EXPENSE`) para o usuário autenticado |
+| `GET` | `/transactions` | 🔒 Sim | Lista as transações do usuário autenticado de forma paginada |
+| `GET` | `/transactions/{id}` | 🔒 Sim | Busca uma transação por ID (retorna 404 se pertencer a outro usuário) |
+| `DELETE` | `/transactions/{id}` | 🔒 Sim | Exclui logicamente a transação do usuário autenticado |
 
 ---
 
 ## 🧪 Testes Automatizados
 
-A aplicação conta com uma suíte de **testes unitários com Mockito** e testes de inicialização do contexto Spring, garantindo cobertura das regras de negócio sem dependência de banco externo:
+A aplicação conta com **25 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
 
 ```bash
 ./mvnw test
 ```
 
 ```text
-[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.isaacggr.finance_app.service.UserServiceTest (8 tests)
+[INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (8 tests)
+[INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (4 tests)
+[INFO] Running com.isaacggr.finance_app.service.TokenServiceTest (4 tests)
+[INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
+[INFO] 
+[INFO] Results:
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

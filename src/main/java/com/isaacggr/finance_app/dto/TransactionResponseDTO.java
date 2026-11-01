@@ -10,7 +10,6 @@ import java.util.UUID;
 
 public record TransactionResponseDTO(
         UUID id,
-        UUID userId,
         BigDecimal amount,
         TransactionType type,
         TransactionCategory category,
@@ -20,7 +19,6 @@ public record TransactionResponseDTO(
     public static TransactionResponseDTO fromEntity(Transaction transaction) {
         return new TransactionResponseDTO(
                 transaction.getId(),
-                transaction.getUser().getId(),
                 transaction.getAmount(),
                 transaction.getType(),
                 transaction.getCategory(),
