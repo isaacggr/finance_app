@@ -177,4 +177,90 @@ class TransactionServiceTest {
 
         assertTrue(sampleTransaction.isDeleted());
     }
+
+    @Test
+    @DisplayName("Deve atualizar transação do usuário com sucesso")
+    void update_Success() {
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.of(sampleTransaction));
+
+        LocalDate newDate = LocalDate.now().plusDays(1);
+        Transaction updated = transactionService.update(
+                transactionId,
+                userId,
+                new BigDecimal("299.90"),
+                TransactionType.INCOME,
+                TransactionCategory.INVESTIMENTOS,
+                newDate,
+                "Rendimento de investimentos"
+        );
+
+        assertNotNull(updated);
+        assertEquals(new BigDecimal("299.90"), updated.getAmount());
+        assertEquals(TransactionType.INCOME, updated.getType());
+        assertEquals(TransactionCategory.INVESTIMENTOS, updated.getCategory());
+        assertEquals(newDate, updated.getDate());
+        assertEquals("Rendimento de investimentos", updated.getDescription());
+    }
+
+    @Test
+    @DisplayName("Deve lançar NotFoundException ao tentar atualizar transação inexistente ou de outro usuário")
+    void update_ThrowsNotFound_WhenNotFoundOrNotOwned() {
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> transactionService.update(
+                transactionId,
+                userId,
+                new BigDecimal("100.00"),
+                TransactionType.EXPENSE,
+                TransactionCategory.OUTROS,
+                LocalDate.now(),
+                "Atualização"
+        ));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ConflictException ao tentar atualizar transação com valor inválido")
+    void update_ThrowsConflict_WhenAmountIsZeroOrNegative() {
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.of(sampleTransaction));
+
+        assertThrows(ConflictException.class, () -> transactionService.update(
+                transactionId,
+                userId,
+                BigDecimal.ZERO,
+                TransactionType.EXPENSE,
+                TransactionCategory.OUTROS,
+                LocalDate.now(),
+                "Atualização"
+        ));
+
+        assertThrows(ConflictException.class, () -> transactionService.update(
+                transactionId,
+                userId,
+                new BigDecimal("-10.00"),
+                TransactionType.EXPENSE,
+                TransactionCategory.OUTROS,
+                LocalDate.now(),
+                "Atualização"
+        ));
+    }
+
+    @Test
+    @DisplayName("Deve lançar ConflictException ao tentar atualizar transação sem data")
+    void update_ThrowsConflict_WhenDateIsNull() {
+        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+                .thenReturn(Optional.of(sampleTransaction));
+
+        assertThrows(ConflictException.class, () -> transactionService.update(
+                transactionId,
+                userId,
+                new BigDecimal("50.00"),
+                TransactionType.EXPENSE,
+                TransactionCategory.OUTROS,
+                null,
+                "Atualização"
+        ));
+    }
 }

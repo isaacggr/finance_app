@@ -10,7 +10,7 @@
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203.1-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](http://localhost:8080/swagger-ui.html)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-25%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-29%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -37,8 +37,9 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 
 * **🔐 Autenticação Stateless (JWT):** Sessões stateless gerenciadas via tokens JWT assinados com algoritmo **HMAC-SHA256**, lendo chave secreta e expiração de variáveis de ambiente.
 * **🛡️ Eliminação Estrita de IDOR (OWASP):** As rotas de transações **nunca** recebem `userId` no corpo ou na URL. O usuário autenticado é extraído diretamente do contexto de segurança (`SecurityContextHolder`), garantindo isolamento total de dados entre contas.
+* **⚡ Alta Concorrência com Virtual Threads:** Habilitado o modelo leve do Java 21 (`spring.threads.virtual.enabled=true`), permitindo atender milhares de conexões I/O simultâneas sem sobrecarregar a memória do sistema operacional.
 * **👤 Gestão de Usuários:** Cadastro com validação de formato e senhas criptografadas com **BCrypt**.
-* **💳 Gestão de Transações:** Registro de receitas (`INCOME`) e despesas (`EXPENSE`) organizadas por categorias (alimentação, moradia, transporte, lazer, etc.).
+* **💳 Gestão de Transações:** CRUD completo (criação, consulta, atualização e remoção) com receitas (`INCOME`) e despesas (`EXPENSE`) organizadas por categorias.
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
 * **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
 * **⏱️ Auditoria Automática:** Preenchimento automático de data/hora de criação (`created_at`) e atualização (`updated_at`) via ciclo de vida JPA (`@PrePersist` e `@PreUpdate`).
@@ -148,13 +149,14 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 | `POST` | `/transactions` | 🔒 Sim | Cria uma receita (`INCOME`) ou despesa (`EXPENSE`) para o usuário autenticado |
 | `GET` | `/transactions` | 🔒 Sim | Lista as transações do usuário autenticado de forma paginada |
 | `GET` | `/transactions/{id}` | 🔒 Sim | Busca uma transação por ID (retorna 404 se pertencer a outro usuário) |
+| `PUT` | `/transactions/{id}` | 🔒 Sim | Atualiza os dados de uma transação pertencente ao usuário autenticado |
 | `DELETE` | `/transactions/{id}` | 🔒 Sim | Exclui logicamente a transação do usuário autenticado |
 
 ---
 
 ## 🧪 Testes Automatizados
 
-A aplicação conta com **25 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
+A aplicação conta com **29 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
 
 ```bash
 ./mvnw test
@@ -162,13 +164,13 @@ A aplicação conta com **25 testes unitários** com **JUnit 5** e **Mockito**, 
 
 ```text
 [INFO] Running com.isaacggr.finance_app.service.UserServiceTest (8 tests)
-[INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (8 tests)
+[INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (12 tests)
 [INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.service.TokenServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
 [INFO] 
 [INFO] Results:
-[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

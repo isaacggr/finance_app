@@ -18,8 +18,12 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Finance App API")
-                        .description("API REST para controle e gestão financeira pessoal")
+                        .title("💰 Finance App API")
+                        .description("### API RESTful para controle e gestão financeira pessoal\n\n"
+                                + "Para testar rotas protegidas:\n"
+                                + "1. Crie sua conta em `POST /users` (ou use um usuário existente);\n"
+                                + "2. Autentique-se em `POST /auth/login` e copie o `accessToken`;\n"
+                                + "3. Clique no botão **Authorize 🔓** no topo, informe `Bearer SEU_TOKEN` e confirme.")
                         .version("v1.0.0")
                         .contact(new Contact()
                                 .name("Isaac Gregório")

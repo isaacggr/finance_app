@@ -5,6 +5,10 @@ spring:
   application:
     name: finance-app
 
+  threads:
+    virtual:
+      enabled: true
+
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:finance_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     username: ${DB_USER}
@@ -33,4 +37,13 @@ logging:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000 # 24 horas em milissegundos
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    filter: true
+    doc-expansion: none
 

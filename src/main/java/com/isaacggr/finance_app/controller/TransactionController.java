@@ -5,8 +5,10 @@ import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.dto.PageResponseDTO;
 import com.isaacggr.finance_app.dto.TransactionCreateDTO;
 import com.isaacggr.finance_app.dto.TransactionResponseDTO;
+import com.isaacggr.finance_app.dto.TransactionUpdateDTO;
 import com.isaacggr.finance_app.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -68,7 +70,7 @@ public class TransactionController {
     @GetMapping("/{transactionId}")
     @Operation(summary = "Buscar transação por ID", description = "Busca uma transação específica pertencente ao usuário autenticado")
     public ResponseEntity<TransactionResponseDTO> getById(
-            @PathVariable UUID transactionId,
+            @PathVariable @Parameter(description = "Identificador único (UUID) da transação", example = "05498412-beb1-4060-ae2a-74152f144619") UUID transactionId,
             @AuthenticationPrincipal User user
     ) {
         Transaction transaction = transactionService.findById(transactionId, user.getId());
@@ -78,11 +80,32 @@ public class TransactionController {
         );
     }
 
+    // ✅ Atualizar transação existente do usuário autenticado
+    @PutMapping("/{transactionId}")
+    @Operation(summary = "Atualizar transação", description = "Atualiza completamente os dados de uma transação existente do usuário autenticado")
+    public ResponseEntity<TransactionResponseDTO> update(
+            @PathVariable @Parameter(description = "Identificador único (UUID) da transação", example = "05498412-beb1-4060-ae2a-74152f144619") UUID transactionId,
+            @RequestBody @Valid TransactionUpdateDTO dto,
+            @AuthenticationPrincipal User user
+    ) {
+        Transaction updated = transactionService.update(
+                transactionId,
+                user.getId(),
+                dto.amount(),
+                dto.type(),
+                dto.category(),
+                dto.date(),
+                dto.description()
+        );
+
+        return ResponseEntity.ok(TransactionResponseDTO.fromEntity(updated));
+    }
+
     // ✅ Soft delete (apenas se pertencer ao usuário autenticado)
     @DeleteMapping("/{transactionId}")
     @Operation(summary = "Excluir transação", description = "Exclui logicamente uma transação pertencente ao usuário autenticado")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID transactionId,
+            @PathVariable @Parameter(description = "Identificador único (UUID) da transação", example = "05498412-beb1-4060-ae2a-74152f144619") UUID transactionId,
             @AuthenticationPrincipal User user
     ) {
         transactionService.delete(transactionId, user.getId());

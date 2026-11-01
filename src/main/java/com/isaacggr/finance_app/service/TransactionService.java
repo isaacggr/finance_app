@@ -81,6 +81,32 @@ public class TransactionService {
     }
 
     // ======================
+    // UPDATE (Atualiza transação pertencente ao usuário autenticado)
+    // ======================
+    public Transaction update(
+            UUID transactionId,
+            UUID userId,
+            BigDecimal amount,
+            TransactionType type,
+            TransactionCategory category,
+            LocalDate date,
+            String description
+    ) {
+        Transaction transaction = findById(transactionId, userId);
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ConflictException("Valor da transação deve ser maior que zero");
+        }
+
+        if (date == null) {
+            throw new ConflictException("Data da transação é obrigatória");
+        }
+
+        transaction.update(amount, type, category, date, description);
+        return transaction;
+    }
+
+    // ======================
     // DELETE (Soft delete da transação do usuário)
     // ======================
     public void delete(UUID transactionId, UUID userId) {
