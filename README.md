@@ -8,6 +8,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Security](https://img.shields.io/badge/Spring%20Security-JWT-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)](https://spring.io/projects/spring-security)
 [![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203.1-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](http://localhost:8080/swagger-ui.html)
+[![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/Tests-34%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
@@ -43,6 +44,7 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 * **🔍 Filtros Financeiros Dinâmicos:** Consulta ao extrato com filtros opcionais combinados via **JPA Specification** por período (`startDate`/`endDate`), categoria e tipo.
 * **📊 Dashboard & Métricas de Alta Performance:** Resumo analítico com total de receitas, despesas, saldo líquido e detalhamento por categoria calculado via **agregação nativa SQL (`SUM`, `GROUP BY`)** no banco de dados.
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
+* **📦 Versionamento de Banco com Flyway:** Schema SQL versionado de forma declarativa e auditável (`V1__create_initial_schema.sql`), desativando o modo inseguro de autogeração do Hibernate (`ddl-auto: validate`).
 * **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
 * **⏱️ Auditoria Automática:** Preenchimento automático de data/hora de criação (`created_at`) e atualização (`updated_at`) via ciclo de vida JPA (`@PrePersist` e `@PreUpdate`).
 
