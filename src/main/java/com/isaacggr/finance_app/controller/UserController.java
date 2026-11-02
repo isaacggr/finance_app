@@ -1,17 +1,16 @@
 package com.isaacggr.finance_app.controller;
 
+import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/users")
@@ -34,22 +33,22 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // ✅ Buscar usuário por ID
-    @GetMapping("/{id}")
-    @Operation(summary = "Buscar usuário por ID", description = "Retorna os dados públicos de um usuário cadastrado")
-    public ResponseEntity<UserResponseDTO> findById(
-            @PathVariable @Parameter(description = "Identificador único (UUID) do usuário", example = "e4c3b2a1-0000-4000-8000-123456789abc") UUID id
+    // ✅ Obter perfil do usuário autenticado (Zero IDOR)
+    @GetMapping("/me")
+    @Operation(summary = "Obter perfil autenticado", description = "Retorna os dados cadastrais do próprio usuário autenticado. Essencial para o carregamento de sessão no front-end.")
+    public ResponseEntity<UserResponseDTO> getProfile(
+            @AuthenticationPrincipal User user
     ) {
-        return ResponseEntity.ok(service.findById(id));
+        return ResponseEntity.ok(service.findById(user.getId()));
     }
 
-    // ✅ Soft delete
-    @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir usuário", description = "Realiza a exclusão lógica (soft delete) do usuário pelo ID")
+    // ✅ Excluir própria conta (Zero IDOR)
+    @DeleteMapping("/me")
+    @Operation(summary = "Excluir própria conta", description = "Realiza a exclusão lógica (soft delete) da conta do próprio usuário autenticado")
     public ResponseEntity<Void> delete(
-            @PathVariable @Parameter(description = "Identificador único (UUID) do usuário", example = "e4c3b2a1-0000-4000-8000-123456789abc") UUID id
+            @AuthenticationPrincipal User user
     ) {
-        service.delete(id);
+        service.delete(user.getId());
         return ResponseEntity.noContent().build();
     }
 }

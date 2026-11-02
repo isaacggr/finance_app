@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -160,7 +161,7 @@ class TransactionServiceTest {
     @DisplayName("Deve listar transações do usuário de forma paginada")
     void listByUser_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(userId, pageable);
@@ -173,7 +174,7 @@ class TransactionServiceTest {
     @DisplayName("Deve listar transações com filtros de período, categoria e tipo")
     void listByUser_WithFilters_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(

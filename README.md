@@ -137,8 +137,8 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 | Verbo | Rota | Autenticado? | Descrição |
 | :---: | :--- | :---: | :--- |
 | `POST` | `/users` | Não | Cadastra um novo usuário com senha criptografada via BCrypt |
-| `GET` | `/users/{id}` | 🔒 Sim | Busca os dados públicos do usuário por ID |
-| `DELETE` | `/users/{id}` | 🔒 Sim | Realiza a exclusão lógica (*soft delete*) do usuário |
+| `GET` | `/users/me` | 🔒 Sim | Retorna os dados do próprio usuário autenticado (Zero IDOR) |
+| `DELETE` | `/users/me` | 🔒 Sim | Realiza a exclusão lógica (*soft delete*) da conta do próprio usuário |
 
 ---
 
