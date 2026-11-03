@@ -11,7 +11,7 @@
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-34%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-41%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -43,6 +43,7 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 * **💳 Gestão de Transações:** CRUD completo (criação, consulta, atualização e remoção) com receitas (`INCOME`) e despesas (`EXPENSE`) organizadas por categorias.
 * **🔍 Filtros Financeiros Dinâmicos:** Consulta ao extrato com filtros opcionais combinados via **JPA Specification** por período (`startDate`/`endDate`), categoria e tipo.
 * **📊 Dashboard & Métricas de Alta Performance:** Resumo analítico com total de receitas, despesas, saldo líquido e detalhamento por categoria calculado via **agregação nativa SQL (`SUM`, `GROUP BY`)** no banco de dados.
+* **🎯 Metas e Orçamentos Mensais (Budgets):** Definição de limites de gastos por categoria e mês/ano, com monitoramento em tempo real do progresso (% consumido, saldo restante e alerta de estouro de teto).
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
 * **📦 Versionamento de Banco com Flyway:** Schema SQL versionado de forma declarativa e auditável (`V1__create_initial_schema.sql`), desativando o modo inseguro de autogeração do Hibernate (`ddl-auto: validate`).
 * **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
@@ -166,9 +167,22 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 
 ---
 
+### 🎯 Orçamentos (`/budgets`)
+
+> 🔒 *Todas as operações de orçamento são estritamente associadas ao usuário autenticado.*
+
+| Verbo | Rota | Autenticado? | Descrição |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/budgets` | 🔒 Sim | Define uma meta/teto de gastos para uma categoria em determinado mês/ano |
+| `GET` | `/budgets` | 🔒 Sim | Lista as metas cadastradas pelo usuário para o mês e ano informados |
+| `GET` | `/budgets/progress` | 🔒 Sim | Retorna o progresso em tempo real (gasto, restante, % consumido e alerta de estouro) |
+| `DELETE` | `/budgets/{id}` | 🔒 Sim | Exclui logicamente (*soft delete*) o orçamento do usuário autenticado |
+
+---
+
 ## 🧪 Testes Automatizados
 
-A aplicação conta com **34 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
+A aplicação conta com **41 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
 
 ```bash
 ./mvnw test
@@ -176,14 +190,15 @@ A aplicação conta com **34 testes unitários** com **JUnit 5** e **Mockito**, 
 
 ```text
 [INFO] Running com.isaacggr.finance_app.service.UserServiceTest (8 tests)
-[INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (14 tests)
 [INFO] Running com.isaacggr.finance_app.service.DashboardServiceTest (3 tests)
+[INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (14 tests)
 [INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.service.TokenServiceTest (4 tests)
+[INFO] Running com.isaacggr.finance_app.service.BudgetServiceTest (7 tests)
 [INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
 [INFO] 
 [INFO] Results:
-[INFO] Tests run: 34, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 41, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

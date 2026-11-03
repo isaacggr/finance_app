@@ -1,5 +1,6 @@
 package com.isaacggr.finance_app;
 
+import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,9 @@ class FinaceAppApplicationTests {
 
     @MockitoBean
     private TransactionRepository transactionRepository;
+
+    @MockitoBean
+    private BudgetRepository budgetRepository;
 
     @Test
     void contextLoads() {
