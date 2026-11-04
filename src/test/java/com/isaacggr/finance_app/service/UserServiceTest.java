@@ -1,6 +1,8 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.VerificationToken;
+import com.isaacggr.finance_app.domain.enums.TokenType;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.exception.ConflictException;
@@ -15,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +34,12 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private VerificationTokenService verificationTokenService;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private UserService userService;
@@ -50,6 +59,8 @@ class UserServiceTest {
         when(userRepository.findByEmail(dto.email())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(dto.password())).thenReturn("encodedPassword123");
         when(userRepository.save(any(User.class))).thenReturn(sampleUser);
+        when(verificationTokenService.createEmailVerificationToken(any(User.class)))
+                .thenReturn(new VerificationToken(sampleUser, "token-123", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(24)));
 
         UserResponseDTO response = userService.create(dto);
 
@@ -57,6 +68,8 @@ class UserServiceTest {
         assertEquals(dto.name(), response.name());
         assertEquals(dto.email(), response.email());
         verify(userRepository, times(1)).save(any(User.class));
+        verify(verificationTokenService, times(1)).createEmailVerificationToken(sampleUser);
+        verify(emailService, times(1)).sendVerificationEmail(eq("isaac@example.com"), eq("Isaac Gregorio"), anyString());
     }
 
     @Test

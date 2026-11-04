@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.exception.ConflictException;
@@ -20,13 +21,19 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final VerificationTokenService verificationTokenService;
+    private final EmailService emailService;
 
     public UserService(
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            VerificationTokenService verificationTokenService,
+            EmailService emailService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.verificationTokenService = verificationTokenService;
+        this.emailService = emailService;
     }
 
     // ======================
@@ -48,9 +55,13 @@ public class UserService {
                 passwordEncoder.encode(dto.password())
         );
 
-        return UserResponseDTO.fromEntity(
-                userRepository.save(user)
-        );
+        User savedUser = userRepository.save(user);
+
+        // Gera token temporário de ativação (24h) e dispara e-mail de confirmação
+        VerificationToken token = verificationTokenService.createEmailVerificationToken(savedUser);
+        emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getName(), token.getToken());
+
+        return UserResponseDTO.fromEntity(savedUser);
     }
 
     // ======================

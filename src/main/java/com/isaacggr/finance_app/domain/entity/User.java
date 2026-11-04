@@ -28,6 +28,9 @@ public class User {
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
     @Column(nullable = false)
     private boolean deleted = false;
 
@@ -42,6 +45,7 @@ public class User {
         this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
+        this.emailVerified = false;
         this.deleted = false;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -77,5 +81,13 @@ public class User {
 
     public void changeName(String name) {
         this.name = name;
+    }
+
+    public void verifyEmail() {
+        this.emailVerified = true;
+    }
+
+    public void updatePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
     }
 }
