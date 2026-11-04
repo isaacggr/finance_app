@@ -47,6 +47,7 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 * **📊 Dashboard & Métricas de Alta Performance:** Resumo analítico com total de receitas, despesas, saldo líquido e detalhamento por categoria calculado via **agregação nativa SQL (`SUM`, `GROUP BY`)** no banco de dados.
 * **🎯 Metas e Orçamentos Mensais (Budgets):** Definição de limites de gastos por categoria e mês/ano, com monitoramento em tempo real do progresso (% consumido, saldo restante e alerta de estouro de teto).
 * **📬 Relatórios Mensais Automatizados:** Rotina periódica agendada (`@Scheduled`) que consolida o extrato financeiro do mês fechado e despacha um e-mail com template HTML corporativo, além de endpoint sob demanda (`POST /reports/monthly/send-me`).
+* **🐳 Conteinerização Multi-Stage (Docker):** Imagem de produção mínima baseada em Alpine Linux (~180MB) executando com usuário seguro não-root (Princípio do Menor Privilégio) e orquestração sincronizada via Docker Compose com healthcheck no MySQL.
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
 * **📦 Versionamento de Banco com Flyway:** Schema SQL versionado de forma declarativa e auditável (`V1__create_initial_schema.sql`), desativando o modo inseguro de autogeração do Hibernate (`ddl-auto: validate`).
 * **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
@@ -108,10 +109,11 @@ cd finance_app
 # 2. Configure o arquivo de variáveis de ambiente
 cp .env.example .env
 
-# 3. Inicie o banco de dados MySQL via Docker Compose
-docker compose up -d
+# 3. Execução 100% Conteinerizada (MySQL + API Spring Boot):
+docker compose up -d --build
 
-# 4. Inicie a aplicação Spring Boot
+# OU se preferir rodar a API localmente via Maven:
+docker compose up -d finance-mysql
 ./mvnw spring-boot:run
 ```
 
