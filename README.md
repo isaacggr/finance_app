@@ -11,7 +11,7 @@
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-57%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -46,6 +46,7 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 * **🔍 Filtros Financeiros Dinâmicos:** Consulta ao extrato com filtros opcionais combinados via **JPA Specification** por período (`startDate`/`endDate`), categoria e tipo.
 * **📊 Dashboard & Métricas de Alta Performance:** Resumo analítico com total de receitas, despesas, saldo líquido e detalhamento por categoria calculado via **agregação nativa SQL (`SUM`, `GROUP BY`)** no banco de dados.
 * **🎯 Metas e Orçamentos Mensais (Budgets):** Definição de limites de gastos por categoria e mês/ano, com monitoramento em tempo real do progresso (% consumido, saldo restante e alerta de estouro de teto).
+* **📬 Relatórios Mensais Automatizados:** Rotina periódica agendada (`@Scheduled`) que consolida o extrato financeiro do mês fechado e despacha um e-mail com template HTML corporativo, além de endpoint sob demanda (`POST /reports/monthly/send-me`).
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
 * **📦 Versionamento de Banco com Flyway:** Schema SQL versionado de forma declarativa e auditável (`V1__create_initial_schema.sql`), desativando o modo inseguro de autogeração do Hibernate (`ddl-auto: validate`).
 * **🗑️ Exclusão Lógica (*Soft Delete*):** Registros nunca são deletados fisicamente do banco de dados, preservando a integridade histórica.
@@ -186,9 +187,19 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 
 ---
 
+### 📑 Relatórios (`/reports`)
+
+> 🔒 *Disparo de extratos consolidado por e-mail para o usuário autenticado.*
+
+| Verbo | Rota | Autenticado? | Descrição |
+| :---: | :--- | :---: | :--- |
+| `POST` | `/reports/monthly/send-me` | 🔒 Sim | Envia o relatório mensal com receitas, despesas, saldo e categorias para o e-mail do usuário |
+
+---
+
 ## 🧪 Testes Automatizados
 
-A aplicação conta com **52 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
+A aplicação conta com **57 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
 
 ```bash
 ./mvnw test
@@ -200,12 +211,13 @@ A aplicação conta com **52 testes unitários** com **JUnit 5** e **Mockito**, 
 [INFO] Running com.isaacggr.finance_app.service.DashboardServiceTest (3 tests)
 [INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (14 tests)
 [INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (10 tests)
+[INFO] Running com.isaacggr.finance_app.service.MonthlyReportServiceTest (5 tests)
 [INFO] Running com.isaacggr.finance_app.service.TokenServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.service.BudgetServiceTest (7 tests)
 [INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
 [INFO] 
 [INFO] Results:
-[INFO] Tests run: 52, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 57, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

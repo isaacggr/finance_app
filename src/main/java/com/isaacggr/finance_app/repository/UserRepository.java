@@ -17,4 +17,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByIdAndDeletedFalse(UUID id);
 
     List<User> findAllByDeletedFalse();
+
+    List<User> findByEmailVerifiedTrueAndDeletedFalse();
 }
