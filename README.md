@@ -11,7 +11,7 @@
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-48%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-52%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -37,6 +37,8 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 ### ✨ Principais Recursos e Decisões de Engenharia:
 
 * **🔐 Autenticação Stateless (JWT):** Sessões stateless gerenciadas via tokens JWT assinados com algoritmo **HMAC-SHA256**, lendo chave secreta e expiração de variáveis de ambiente.
+* **✉️ Verificação de E-mail & Ativação de Conta:** Envio de código numérico de 6 dígitos via SMTP (`JavaMailSender`) com expiração de 15 minutos e bloqueio estrito de login para contas pendentes (HTTP 403 Forbidden).
+* **🔑 Recuperação Segura de Senha (OWASP):** Redefinição de senha com códigos temporários de 6 dígitos via e-mail e proteção contra enumeração de usuários (retorno neutro para evitar vazamento de existência de contas).
 * **🛡️ Eliminação Estrita de IDOR (OWASP):** As rotas de transações **nunca** recebem `userId` no corpo ou na URL. O usuário autenticado é extraído diretamente do contexto de segurança (`SecurityContextHolder`), garantindo isolamento total de dados entre contas.
 * **⚡ Alta Concorrência com Virtual Threads:** Habilitado o modelo leve do Java 21 (`spring.threads.virtual.enabled=true`), permitindo atender milhares de conexões I/O simultâneas sem sobrecarregar a memória do sistema operacional.
 * **👤 Gestão de Usuários:** Cadastro com validação de formato e senhas criptografadas com **BCrypt**.
@@ -134,6 +136,8 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 | `POST` | `/auth/login` | Não | Autentica o usuário com e-mail/senha e retorna o token JWT Bearer (exige conta ativa) |
 | `POST` | `/auth/verify-email` | Não | Confirma a ativação da conta através do código de 6 dígitos recebido por e-mail |
 | `POST` | `/auth/resend-code` | Não | Reenvia o código de ativação caso o anterior tenha expirado ou sido perdido |
+| `POST` | `/auth/forgot-password` | Não | Solicita código de 6 dígitos para recuperação de senha (proteção anti-enumeração) |
+| `POST` | `/auth/reset-password` | Não | Redefine a senha utilizando o código de 6 dígitos e a nova senha |
 
 ---
 
@@ -184,7 +188,7 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 
 ## 🧪 Testes Automatizados
 
-A aplicação conta com **48 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
+A aplicação conta com **52 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
 
 ```bash
 ./mvnw test
@@ -195,13 +199,13 @@ A aplicação conta com **48 testes unitários** com **JUnit 5** e **Mockito**, 
 [INFO] Running com.isaacggr.finance_app.service.VerificationTokenServiceTest (5 tests)
 [INFO] Running com.isaacggr.finance_app.service.DashboardServiceTest (3 tests)
 [INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (14 tests)
-[INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (6 tests)
+[INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (10 tests)
 [INFO] Running com.isaacggr.finance_app.service.TokenServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.service.BudgetServiceTest (7 tests)
 [INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
 [INFO] 
 [INFO] Results:
-[INFO] Tests run: 48, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 52, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

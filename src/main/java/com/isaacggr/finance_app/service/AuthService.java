@@ -3,8 +3,11 @@ package com.isaacggr.finance_app.service;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.domain.enums.TokenType;
+import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
+import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
+import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ForbiddenException;
 import com.isaacggr.finance_app.exception.UnauthorizedException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -82,6 +85,35 @@ public class AuthService {
                         emailService.sendVerificationEmail(user.getEmail(), user.getName(), token.getToken());
                     }
                 });
+    }
+
+    // ==========================================
+    // RECUPERAÇÃO DE SENHA - SOLICITAÇÃO (OWASP Anti-Enumeração)
+    // ==========================================
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequestDTO dto) {
+        userRepository.findByEmail(dto.email())
+                .filter(User::isActive)
+                .ifPresent(user -> {
+                    VerificationToken token = verificationTokenService.createPasswordResetToken(user);
+                    emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), token.getToken());
+                });
+    }
+
+    // ==========================================
+    // RECUPERAÇÃO DE SENHA - REDEFINIÇÃO
+    // ==========================================
+    @Transactional
+    public void resetPassword(ResetPasswordRequestDTO dto) {
+        VerificationToken verificationToken = verificationTokenService.validateToken(dto.code(), TokenType.PASSWORD_RESET);
+        User user = verificationToken.getUser();
+
+        if (!user.getEmail().equalsIgnoreCase(dto.email())) {
+            throw new BusinessException("O código informado não pertence ao e-mail fornecido.");
+        }
+
+        user.updatePassword(passwordEncoder.encode(dto.newPassword()));
+        userRepository.save(user);
     }
 }
 

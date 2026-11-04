@@ -3,8 +3,11 @@ package com.isaacggr.finance_app.service;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.domain.enums.TokenType;
+import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
+import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
+import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ForbiddenException;
 import com.isaacggr.finance_app.exception.UnauthorizedException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -162,6 +165,67 @@ class AuthServiceTest {
 
         assertEquals("Credenciais inválidas", exception.getMessage());
         verify(tokenService, never()).generateToken(any());
+    }
+
+    @Test
+    @DisplayName("Deve gerar código e enviar e-mail de recuperação quando o e-mail existir")
+    void forgotPassword_Success_WhenUserExists() {
+        ForgotPasswordRequestDTO dto = new ForgotPasswordRequestDTO("isaac@example.com");
+        VerificationToken token = new VerificationToken(sampleUser, "654321", TokenType.PASSWORD_RESET, LocalDateTime.now().plusMinutes(30));
+
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
+        when(verificationTokenService.createPasswordResetToken(sampleUser)).thenReturn(token);
+
+        authService.forgotPassword(dto);
+
+        verify(verificationTokenService).createPasswordResetToken(sampleUser);
+        verify(emailService).sendPasswordResetEmail(eq("isaac@example.com"), eq("Isaac Gregorio"), eq("654321"));
+    }
+
+    @Test
+    @DisplayName("Deve silenciar e não vazar erro quando o e-mail não existir na recuperação (Anti-Enumeração OWASP)")
+    void forgotPassword_SilentSuccess_WhenUserNotFound() {
+        ForgotPasswordRequestDTO dto = new ForgotPasswordRequestDTO("desconhecido@example.com");
+
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> authService.forgotPassword(dto));
+
+        verify(verificationTokenService, never()).createPasswordResetToken(any());
+        verify(emailService, never()).sendPasswordResetEmail(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Deve redefinir senha com sucesso quando código e e-mail forem válidos")
+    void resetPassword_Success() {
+        ResetPasswordRequestDTO dto = new ResetPasswordRequestDTO("isaac@example.com", "654321", "NovaSenhaForte123!");
+        VerificationToken token = new VerificationToken(sampleUser, "654321", TokenType.PASSWORD_RESET, LocalDateTime.now().plusMinutes(30));
+
+        when(verificationTokenService.validateToken("654321", TokenType.PASSWORD_RESET)).thenReturn(token);
+        when(passwordEncoder.encode("NovaSenhaForte123!")).thenReturn("newBcryptHash123");
+
+        authService.resetPassword(dto);
+
+        assertEquals("newBcryptHash123", sampleUser.getPasswordHash());
+        verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve lançar BusinessException quando o código pertencer a outro usuário")
+    void resetPassword_ThrowsBusinessException_WhenEmailMismatch() {
+        User otherUser = new User("Outro", "outro@example.com", "hash");
+        ResetPasswordRequestDTO dto = new ResetPasswordRequestDTO("isaac@example.com", "654321", "NovaSenhaForte123!");
+        VerificationToken token = new VerificationToken(otherUser, "654321", TokenType.PASSWORD_RESET, LocalDateTime.now().plusMinutes(30));
+
+        when(verificationTokenService.validateToken("654321", TokenType.PASSWORD_RESET)).thenReturn(token);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.resetPassword(dto)
+        );
+
+        assertEquals("O código informado não pertence ao e-mail fornecido.", exception.getMessage());
+        verify(userRepository, never()).save(any());
     }
 }
 

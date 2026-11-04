@@ -85,7 +85,7 @@ public class EmailService {
             mailSender.send(message);
             log.info("E-mail enviado com sucesso para: {}", to);
         } catch (MessagingException | RuntimeException ex) {
-            log.error("Falha ao enviar e-mail para {}: {}", to, ex.getMessage());
+            log.error("Falha ao enviar e-mail para {}: {}", to, ex.getMessage(), ex);
         }
     }
 }
