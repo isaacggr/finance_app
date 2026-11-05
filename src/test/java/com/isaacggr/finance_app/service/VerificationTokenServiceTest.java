@@ -114,6 +114,85 @@ class VerificationTokenServiceTest {
     }
 
     @Test
+    @DisplayName("Deve validar código de 6 dígitos com e-mail com sucesso")
+    void validateTokenWithEmail_Success() {
+        VerificationToken token = new VerificationToken(sampleUser, "123456", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(1));
+
+        when(verificationTokenRepository.findByUserEmailAndTypeAndUsedFalse("isaac@example.com", TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(token));
+        when(verificationTokenRepository.save(any(VerificationToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        VerificationToken result = verificationTokenService.validateTokenWithEmail("isaac@example.com", "123456", TokenType.EMAIL_VERIFICATION);
+
+        assertNotNull(result);
+        assertTrue(result.isUsed());
+        assertEquals(0, result.getAttempts());
+        verify(verificationTokenRepository).save(token);
+    }
+
+    @Test
+    @DisplayName("Deve falhar com código incorreto e decrementar tentativas restantes")
+    void validateTokenWithEmail_IncorrectCode_IncrementsAttempts() {
+        VerificationToken token = new VerificationToken(sampleUser, "123456", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(1));
+
+        when(verificationTokenRepository.findByUserEmailAndTypeAndUsedFalse("isaac@example.com", TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(token));
+        when(verificationTokenRepository.save(any(VerificationToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> verificationTokenService.validateTokenWithEmail("isaac@example.com", "999999", TokenType.EMAIL_VERIFICATION)
+        );
+
+        assertTrue(exception.getMessage().contains("Código incorreto. Tentativas restantes: 4"));
+        assertEquals(1, token.getAttempts());
+        assertFalse(token.isUsed());
+        verify(verificationTokenRepository).save(token);
+    }
+
+    @Test
+    @DisplayName("Deve bloquear e invalidar token ao atingir o limite de 5 tentativas")
+    void validateTokenWithEmail_LocksAndInvalidatesToken_WhenMaxAttemptsReached() {
+        VerificationToken token = new VerificationToken(sampleUser, "123456", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(1));
+        ReflectionTestUtils.setField(token, "attempts", 4);
+
+        when(verificationTokenRepository.findByUserEmailAndTypeAndUsedFalse("isaac@example.com", TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(token));
+        when(verificationTokenRepository.save(any(VerificationToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> verificationTokenService.validateTokenWithEmail("isaac@example.com", "000000", TokenType.EMAIL_VERIFICATION)
+        );
+
+        assertTrue(exception.getMessage().contains("Número máximo de tentativas excedido (5)"));
+        assertEquals(5, token.getAttempts());
+        assertTrue(token.isUsed());
+        verify(verificationTokenRepository).save(token);
+    }
+
+    @Test
+    @DisplayName("Deve falhar ao validar token expirado com email")
+    void validateTokenWithEmail_ThrowsBusinessException_WhenExpired() {
+        VerificationToken expiredToken = new VerificationToken(sampleUser, "123456", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().minusMinutes(5));
+
+        when(verificationTokenRepository.findByUserEmailAndTypeAndUsedFalse("isaac@example.com", TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(expiredToken));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> verificationTokenService.validateTokenWithEmail("isaac@example.com", "123456", TokenType.EMAIL_VERIFICATION)
+        );
+
+        assertEquals("Código expirado. Por favor, solicite um novo código.", exception.getMessage());
+        assertTrue(expiredToken.isUsed());
+        verify(verificationTokenRepository).save(expiredToken);
+    }
+
+    @Test
     @DisplayName("Deve executar expurgo de tokens expirados agendado")
     void purgeExpiredTokens_Success() {
         when(verificationTokenRepository.deleteByExpiresAtBefore(any(LocalDateTime.class))).thenReturn(5);

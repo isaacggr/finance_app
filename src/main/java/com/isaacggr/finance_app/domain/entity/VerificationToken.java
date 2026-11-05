@@ -12,13 +12,14 @@ import java.util.UUID;
 @Entity
 @Table(name = "verification_tokens", indexes = {
         @Index(name = "idx_verification_tokens_user_type", columnList = "user_id, type"),
-        @Index(name = "idx_verification_tokens_expires", columnList = "expires_at")
-}, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_verification_tokens_token", columnNames = {"token"})
+        @Index(name = "idx_verification_tokens_expires", columnList = "expires_at"),
+        @Index(name = "idx_verification_tokens_token_type", columnList = "token, type")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class VerificationToken {
+
+    public static final int MAX_ATTEMPTS = 5;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,7 +30,7 @@ public class VerificationToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 100, unique = true)
+    @Column(nullable = false, length = 100)
     private String token;
 
     @Enumerated(EnumType.STRING)
@@ -42,6 +43,9 @@ public class VerificationToken {
     @Column(nullable = false)
     private boolean used = false;
 
+    @Column(nullable = false)
+    private int attempts = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -51,6 +55,7 @@ public class VerificationToken {
         this.type = type;
         this.expiresAt = expiresAt;
         this.used = false;
+        this.attempts = 0;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -63,11 +68,21 @@ public class VerificationToken {
     }
 
     public boolean isValid() {
-        return !this.used && !isExpired();
+        return !this.used && !isExpired() && !isMaxAttemptsReached();
     }
 
     public void markAsUsed() {
         this.used = true;
     }
-}
 
+    public void recordFailedAttempt() {
+        this.attempts++;
+        if (this.attempts >= MAX_ATTEMPTS) {
+            this.used = true;
+        }
+    }
+
+    public boolean isMaxAttemptsReached() {
+        return this.attempts >= MAX_ATTEMPTS;
+    }
+}

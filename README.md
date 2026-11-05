@@ -11,7 +11,7 @@
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-57%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-65%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](#-testes-automatizados)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
 
 <br/>
@@ -36,9 +36,11 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 
 ### ✨ Principais Recursos e Decisões de Engenharia:
 
-* **🔐 Autenticação Stateless (JWT):** Sessões stateless gerenciadas via tokens JWT assinados com algoritmo **HMAC-SHA256**, lendo chave secreta e expiração de variáveis de ambiente.
-* **✉️ Verificação de E-mail & Ativação de Conta:** Envio de código numérico de 6 dígitos via SMTP (`JavaMailSender`) com expiração de 15 minutos e bloqueio estrito de login para contas pendentes (HTTP 403 Forbidden).
+* **🔐 Autenticação Stateless (JWT) & Defesa em Profundidade:** Sessões stateless gerenciadas via tokens JWT assinados com algoritmo **HMAC-SHA256**. O `SecurityFilter` realiza dupla validação: confere a assinatura criptográfica e garante que a conta do usuário permanece ativa e com e-mail verificado.
+* **✉️ Verificação de E-mail Scoped por Usuário:** Confirmação de conta através de código numérico de 6 dígitos enviado por e-mail (`email` + `code`), eliminando riscos de colisão global no banco e garantindo bloqueio estrito de login para contas não confirmadas (HTTP 403 Forbidden).
+* **🛡️ Proteção contra Força Bruta & Lockout (OWASP):** Limite estrito de 5 tentativas consecutivas para inserção de códigos de ativação e redefinição de senha. Atingido o limite, o token é imediatamente invalidado por segurança.
 * **🔑 Recuperação Segura de Senha (OWASP):** Redefinição de senha com códigos temporários de 6 dígitos via e-mail e proteção contra enumeração de usuários (retorno neutro para evitar vazamento de existência de contas).
+* **🌐 Suporte Integrado a CORS:** Configuração de `CorsConfigurationSource` habilitada no Spring Security com suporte a credenciais e múltiplos métodos HTTP para conexão imediata com SPAs e frontends (React, Vue, Vite, Next.js).
 * **🛡️ Eliminação Estrita de IDOR (OWASP):** As rotas de transações **nunca** recebem `userId` no corpo ou na URL. O usuário autenticado é extraído diretamente do contexto de segurança (`SecurityContextHolder`), garantindo isolamento total de dados entre contas.
 * **⚡ Alta Concorrência com Virtual Threads:** Habilitado o modelo leve do Java 21 (`spring.threads.virtual.enabled=true`), permitindo atender milhares de conexões I/O simultâneas sem sobrecarregar a memória do sistema operacional.
 * **👤 Gestão de Usuários:** Cadastro com validação de formato e senhas criptografadas com **BCrypt**.
@@ -46,6 +48,7 @@ O **Finance App** foi desenvolvido para simplificar o controle financeiro pessoa
 * **🔍 Filtros Financeiros Dinâmicos:** Consulta ao extrato com filtros opcionais combinados via **JPA Specification** por período (`startDate`/`endDate`), categoria e tipo.
 * **📊 Dashboard & Métricas de Alta Performance:** Resumo analítico com total de receitas, despesas, saldo líquido e detalhamento por categoria calculado via **agregação nativa SQL (`SUM`, `GROUP BY`)** no banco de dados.
 * **🎯 Metas e Orçamentos Mensais (Budgets):** Definição de limites de gastos por categoria e mês/ano, com monitoramento em tempo real do progresso (% consumido, saldo restante e alerta de estouro de teto).
+* **⏰ Alertas Preventivos de Contas a Vencer:** Rotina agendada diária (`@Scheduled` às 09:00 AM) que rastreia despesas pendentes nos próximos dias (janela padrão de 3 dias) e envia notificações por e-mail com aviso visual amigável, além de endpoint sob demanda (`POST /reports/bill-alerts/send-me`).
 * **📬 Relatórios Mensais Automatizados:** Rotina periódica agendada (`@Scheduled`) que consolida o extrato financeiro do mês fechado e despacha um e-mail com template HTML corporativo, além de endpoint sob demanda (`POST /reports/monthly/send-me`).
 * **🐳 Conteinerização Multi-Stage (Docker):** Imagem de produção mínima baseada em Alpine Linux (~180MB) executando com usuário seguro não-root (Princípio do Menor Privilégio) e orquestração sincronizada via Docker Compose com healthcheck no MySQL.
 * **📄 Paginação Limpa e Otimizada:** Extrato financeiro paginado utilizando um DTO padronizado (`PageResponseDTO`), eliminando metadados internos redundantes da resposta.
@@ -137,7 +140,7 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 | Verbo | Rota | Autenticado? | Descrição |
 | :---: | :--- | :---: | :--- |
 | `POST` | `/auth/login` | Não | Autentica o usuário com e-mail/senha e retorna o token JWT Bearer (exige conta ativa) |
-| `POST` | `/auth/verify-email` | Não | Confirma a ativação da conta através do código de 6 dígitos recebido por e-mail |
+| `POST` | `/auth/verify-email` | Não | Confirma a ativação da conta via JSON (`email` + `code` de 6 dígitos) com proteção anti-força bruta |
 | `POST` | `/auth/resend-code` | Não | Reenvia o código de ativação caso o anterior tenha expirado ou sido perdido |
 | `POST` | `/auth/forgot-password` | Não | Solicita código de 6 dígitos para recuperação de senha (proteção anti-enumeração) |
 | `POST` | `/auth/reset-password` | Não | Redefine a senha utilizando o código de 6 dígitos e a nova senha |
@@ -189,19 +192,20 @@ A API possui documentação viva e interativa baseada na especificação **OpenA
 
 ---
 
-### 📑 Relatórios (`/reports`)
+### 📑 Relatórios & Inteligência Financeira (`/reports`)
 
-> 🔒 *Disparo de extratos consolidado por e-mail para o usuário autenticado.*
+> 🔒 *Disparo de extratos consolidados e alertas preditivos por e-mail para o usuário autenticado.*
 
 | Verbo | Rota | Autenticado? | Descrição |
 | :---: | :--- | :---: | :--- |
 | `POST` | `/reports/monthly/send-me` | 🔒 Sim | Envia o relatório mensal com receitas, despesas, saldo e categorias para o e-mail do usuário |
+| `POST` | `/reports/bill-alerts/send-me` | 🔒 Sim | Envia alerta de contas com vencimento nos próximos dias (`daysAhead`, padrão: 3) |
 
 ---
 
 ## 🧪 Testes Automatizados
 
-A aplicação conta com **57 testes unitários** com **JUnit 5** e **Mockito**, além de testes de contexto do Spring:
+A aplicação conta com **65 testes unitários e de integração** com **JUnit 5** e **Mockito**, cobrindo regras de negócio, segurança e automações:
 
 ```bash
 ./mvnw test
@@ -209,7 +213,8 @@ A aplicação conta com **57 testes unitários** com **JUnit 5** e **Mockito**, 
 
 ```text
 [INFO] Running com.isaacggr.finance_app.service.UserServiceTest (8 tests)
-[INFO] Running com.isaacggr.finance_app.service.VerificationTokenServiceTest (5 tests)
+[INFO] Running com.isaacggr.finance_app.service.VerificationTokenServiceTest (9 tests)
+[INFO] Running com.isaacggr.finance_app.service.BillAlertServiceTest (4 tests)
 [INFO] Running com.isaacggr.finance_app.service.DashboardServiceTest (3 tests)
 [INFO] Running com.isaacggr.finance_app.service.TransactionServiceTest (14 tests)
 [INFO] Running com.isaacggr.finance_app.service.AuthServiceTest (10 tests)
@@ -219,7 +224,7 @@ A aplicação conta com **57 testes unitários** com **JUnit 5** e **Mockito**, 
 [INFO] Running com.isaacggr.finance_app.FinaceAppApplicationTests (1 test)
 [INFO] 
 [INFO] Results:
-[INFO] Tests run: 57, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 65, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 

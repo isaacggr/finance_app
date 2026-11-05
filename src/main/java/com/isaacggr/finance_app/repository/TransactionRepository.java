@@ -62,4 +62,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    // 🔔 Buscar despesas ativas com vencimento no intervalo informado (Alertas de Contas a Vencer)
+    @Query("""
+        SELECT t FROM Transaction t
+        WHERE t.user.id = :userId
+          AND t.type = :type
+          AND t.deleted = false
+          AND t.date >= :startDate
+          AND t.date <= :endDate
+        ORDER BY t.date ASC
+    """)
+    List<Transaction> findUpcomingTransactions(
+            @Param("userId") UUID userId,
+            @Param("type") TransactionType type,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

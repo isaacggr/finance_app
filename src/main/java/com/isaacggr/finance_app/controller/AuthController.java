@@ -4,6 +4,7 @@ import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
 import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
+import com.isaacggr.finance_app.dto.VerifyEmailRequestDTO;
 import com.isaacggr.finance_app.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,11 +34,9 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
-    @Operation(summary = "Confirmar ativação de e-mail", description = "Ativa a conta do usuário através do código numérico de 6 dígitos recebido por e-mail")
-    public ResponseEntity<Map<String, String>> verifyEmail(
-            @RequestParam @Parameter(description = "Código de 6 dígitos enviado por e-mail", example = "482910") String code
-    ) {
-        authService.verifyEmail(code);
+    @Operation(summary = "Confirmar ativação de e-mail", description = "Ativa a conta do usuário através do e-mail e código numérico de 6 dígitos recebido por e-mail")
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestBody @Valid VerifyEmailRequestDTO dto) {
+        authService.verifyEmail(dto);
         return ResponseEntity.ok(Map.of("message", "E-mail verificado com sucesso! Sua conta agora está ativa."));
     }
 

@@ -1,5 +1,6 @@
 package com.isaacggr.finance_app.service;
 
+import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
 import jakarta.mail.MessagingException;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -173,6 +176,86 @@ public class EmailService {
         );
 
         sendHtmlEmail(toEmail, "Relatório Financeiro Mensal (" + periodName + ") - Finance App", htmlContent);
+    }
+
+    @Async
+    public void sendBillAlertEmail(String toEmail, String name, List<Transaction> upcomingBills, int daysAhead) {
+        log.info("🔔 [ALERTA CONTAS] Enviando alerta de {} contas a vencer para {}", upcomingBills.size(), toEmail);
+
+        BigDecimal totalUpcoming = upcomingBills.stream()
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        StringBuilder billRows = new StringBuilder();
+        for (Transaction bill : upcomingBills) {
+            String desc = (bill.getDescription() != null && !bill.getDescription().isBlank())
+                    ? bill.getDescription()
+                    : bill.getCategory().name();
+
+            billRows.append("""
+                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 10px 14px; color: #333333; font-weight: 500;">%s</td>
+                        <td style="padding: 10px 14px; color: #616161;">%s</td>
+                        <td style="padding: 10px 14px; text-align: center; color: #e65100; font-weight: 500;">%s</td>
+                        <td style="padding: 10px 14px; text-align: right; font-weight: bold; color: #c62828;">%s</td>
+                    </tr>
+                    """.formatted(
+                    desc,
+                    bill.getCategory().name(),
+                    bill.getDate().format(dateFormatter),
+                    formatCurrency(bill.getAmount())
+            ));
+        }
+
+        String htmlContent = """
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #ffe082; border-radius: 12px; background-color: #ffffff;">
+                    <div style="text-align: center; border-bottom: 2px solid #fff8e1; padding-bottom: 16px; margin-bottom: 20px;">
+                        <h1 style="color: #e65100; margin: 0; font-size: 24px;">⏰ Alerta de Contas a Vencer</h1>
+                        <p style="color: #616161; margin: 6px 0 0; font-size: 15px;">Aviso preventivo para os próximos <strong>%d dias</strong></p>
+                    </div>
+
+                    <p style="font-size: 15px; color: #333333;">Olá, <strong>%s</strong>! Identificamos que você possui despesas agendadas para vencer nos próximos dias:</p>
+
+                    <!-- CARD DE TOTAL A VENCER -->
+                    <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; padding: 16px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                        <div style="font-size: 12px; color: #e65100; font-weight: bold; text-transform: uppercase;">Total Previsto para Vencer</div>
+                        <div style="font-size: 24px; color: #bf360c; font-weight: bold; margin-top: 4px;">%s</div>
+                    </div>
+
+                    <!-- TABELA DE CONTAS -->
+                    <div style="margin-top: 25px;">
+                        <h3 style="color: #37474f; font-size: 16px; margin-bottom: 12px;">📋 Detalhamento das Despesas</h3>
+                        <table style="width: 100%%; border-collapse: collapse; border: 1px solid #eeeeee; border-radius: 8px; overflow: hidden;">
+                            <thead>
+                                <tr style="background-color: #fafafa; border-bottom: 2px solid #eeeeee; text-align: left;">
+                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161;">Descrição</th>
+                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161;">Categoria</th>
+                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161; text-align: center;">Vencimento</th>
+                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161; text-align: right;">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                %s
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <div style="margin-top: 35px; padding-top: 16px; border-top: 1px solid #eeeeee; text-align: center; font-size: 12px; color: #9e9e9e;">
+                        <p style="margin: 0;">Lembrete automático gerado pelo seu <strong>Finance App</strong>.</p>
+                        <p style="margin: 4px 0 0;">Mantenha o seu planejamento em dia! 🚀</p>
+                    </div>
+                </div>
+                """.formatted(
+                daysAhead,
+                name,
+                formatCurrency(totalUpcoming),
+                billRows.toString()
+        );
+
+        sendHtmlEmail(toEmail, "Alerta de Contas a Vencer nos próximos " + daysAhead + " dias - Finance App", htmlContent);
     }
 
     private String formatCurrency(BigDecimal amount) {

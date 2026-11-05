@@ -14,8 +14,11 @@ import java.util.UUID;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, UUID> {
 
-    // 🔍 Buscar token ativo por string e tipo
+    // 🔍 Buscar token ativo por string e tipo (legado / fallback)
     Optional<VerificationToken> findByTokenAndTypeAndUsedFalse(String token, TokenType type);
+
+    // 🔍 Buscar token ativo escopado pelo e-mail do usuário (Prevenção de colisão e Brute Force)
+    Optional<VerificationToken> findByUserEmailAndTypeAndUsedFalse(String email, TokenType type);
 
     // 🔒 Buscar tokens pendentes de um determinado usuário para invalidar anteriores
     List<VerificationToken> findByUserIdAndTypeAndUsedFalse(UUID userId, TokenType type);

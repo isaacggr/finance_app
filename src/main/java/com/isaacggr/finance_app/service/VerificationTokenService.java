@@ -61,7 +61,37 @@ public class VerificationTokenService {
     }
 
     // ==========================================
-    // VALIDAÇÃO E CONSUMO DO TOKEN (Uso Único)
+    // VALIDAÇÃO COM PROTEÇÃO ANTI-FORÇA BRUTA (Scoped by Email)
+    // ==========================================
+    public VerificationToken validateTokenWithEmail(String email, String code, TokenType type) {
+        VerificationToken verificationToken = verificationTokenRepository
+                .findByUserEmailAndTypeAndUsedFalse(email, type)
+                .orElseThrow(() -> new BusinessException("Código inválido ou já utilizado"));
+
+        if (verificationToken.isExpired()) {
+            verificationToken.markAsUsed();
+            verificationTokenRepository.save(verificationToken);
+            throw new BusinessException("Código expirado. Por favor, solicite um novo código.");
+        }
+
+        if (!verificationToken.getToken().equals(code)) {
+            verificationToken.recordFailedAttempt();
+            verificationTokenRepository.save(verificationToken);
+
+            if (verificationToken.isMaxAttemptsReached()) {
+                throw new BusinessException("Número máximo de tentativas excedido (5). Código invalidado por segurança.");
+            }
+
+            int remaining = VerificationToken.MAX_ATTEMPTS - verificationToken.getAttempts();
+            throw new BusinessException("Código incorreto. Tentativas restantes: " + remaining);
+        }
+
+        verificationToken.markAsUsed();
+        return verificationTokenRepository.save(verificationToken);
+    }
+
+    // ==========================================
+    // VALIDAÇÃO E CONSUMO DO TOKEN (Uso Único - Legado)
     // ==========================================
     public VerificationToken validateToken(String token, TokenType type) {
         VerificationToken verificationToken = verificationTokenRepository

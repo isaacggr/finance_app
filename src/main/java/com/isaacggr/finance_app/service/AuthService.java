@@ -7,7 +7,7 @@ import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
 import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
-import com.isaacggr.finance_app.exception.BusinessException;
+import com.isaacggr.finance_app.dto.VerifyEmailRequestDTO;
 import com.isaacggr.finance_app.exception.ForbiddenException;
 import com.isaacggr.finance_app.exception.UnauthorizedException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -65,8 +65,12 @@ public class AuthService {
     // CONFIRMAÇÃO E ATIVAÇÃO DE CONTA
     // ==========================================
     @Transactional
-    public void verifyEmail(String token) {
-        VerificationToken verificationToken = verificationTokenService.validateToken(token, TokenType.EMAIL_VERIFICATION);
+    public void verifyEmail(VerifyEmailRequestDTO dto) {
+        VerificationToken verificationToken = verificationTokenService.validateTokenWithEmail(
+                dto.email(),
+                dto.code(),
+                TokenType.EMAIL_VERIFICATION
+        );
         User user = verificationToken.getUser();
         user.verifyEmail();
         userRepository.save(user);
@@ -105,13 +109,12 @@ public class AuthService {
     // ==========================================
     @Transactional
     public void resetPassword(ResetPasswordRequestDTO dto) {
-        VerificationToken verificationToken = verificationTokenService.validateToken(dto.code(), TokenType.PASSWORD_RESET);
+        VerificationToken verificationToken = verificationTokenService.validateTokenWithEmail(
+                dto.email(),
+                dto.code(),
+                TokenType.PASSWORD_RESET
+        );
         User user = verificationToken.getUser();
-
-        if (!user.getEmail().equalsIgnoreCase(dto.email())) {
-            throw new BusinessException("O código informado não pertence ao e-mail fornecido.");
-        }
-
         user.updatePassword(passwordEncoder.encode(dto.newPassword()));
         userRepository.save(user);
     }

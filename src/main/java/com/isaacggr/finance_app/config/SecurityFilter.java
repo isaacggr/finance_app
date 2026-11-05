@@ -1,5 +1,6 @@
 package com.isaacggr.finance_app.config;
 
+import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.repository.UserRepository;
 import com.isaacggr.finance_app.service.TokenService;
 import jakarta.servlet.FilterChain;
@@ -41,14 +42,16 @@ public class SecurityFilter extends OncePerRequestFilter {
             if (subject != null) {
                 try {
                     UUID userId = UUID.fromString(subject);
-                    userRepository.findByIdAndDeletedFalse(userId).ifPresent(user -> {
-                        var authentication = new UsernamePasswordAuthenticationToken(
-                                user,
-                                null,
-                                Collections.emptyList()
-                        );
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    });
+                    userRepository.findByIdAndDeletedFalse(userId)
+                            .filter(User::isEmailVerified)
+                            .ifPresent(user -> {
+                                var authentication = new UsernamePasswordAuthenticationToken(
+                                        user,
+                                        null,
+                                        Collections.emptyList()
+                                );
+                                SecurityContextHolder.getContext().setAuthentication(authentication);
+                            });
                 } catch (IllegalArgumentException ignored) {
                     // Se o subject não for um UUID válido, ignora e segue a cadeia
                 }

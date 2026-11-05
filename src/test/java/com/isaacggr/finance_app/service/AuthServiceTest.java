@@ -7,6 +7,7 @@ import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
 import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
+import com.isaacggr.finance_app.dto.VerifyEmailRequestDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ForbiddenException;
 import com.isaacggr.finance_app.exception.UnauthorizedException;
@@ -107,11 +108,12 @@ class AuthServiceTest {
         User pendingUser = new User("Ativacao", "ativacao@example.com", "encodedPassword123");
         assertFalse(pendingUser.isEmailVerified());
 
-        VerificationToken token = new VerificationToken(pendingUser, "valid-token-123", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(24));
+        VerificationToken token = new VerificationToken(pendingUser, "123456", TokenType.EMAIL_VERIFICATION, LocalDateTime.now().plusHours(24));
+        VerifyEmailRequestDTO dto = new VerifyEmailRequestDTO("ativacao@example.com", "123456");
 
-        when(verificationTokenService.validateToken("valid-token-123", TokenType.EMAIL_VERIFICATION)).thenReturn(token);
+        when(verificationTokenService.validateTokenWithEmail("ativacao@example.com", "123456", TokenType.EMAIL_VERIFICATION)).thenReturn(token);
 
-        authService.verifyEmail("valid-token-123");
+        authService.verifyEmail(dto);
 
         assertTrue(pendingUser.isEmailVerified());
         verify(userRepository, times(1)).save(pendingUser);
@@ -201,7 +203,7 @@ class AuthServiceTest {
         ResetPasswordRequestDTO dto = new ResetPasswordRequestDTO("isaac@example.com", "654321", "NovaSenhaForte123!");
         VerificationToken token = new VerificationToken(sampleUser, "654321", TokenType.PASSWORD_RESET, LocalDateTime.now().plusMinutes(30));
 
-        when(verificationTokenService.validateToken("654321", TokenType.PASSWORD_RESET)).thenReturn(token);
+        when(verificationTokenService.validateTokenWithEmail("isaac@example.com", "654321", TokenType.PASSWORD_RESET)).thenReturn(token);
         when(passwordEncoder.encode("NovaSenhaForte123!")).thenReturn("newBcryptHash123");
 
         authService.resetPassword(dto);
@@ -211,20 +213,19 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar BusinessException quando o código pertencer a outro usuário")
-    void resetPassword_ThrowsBusinessException_WhenEmailMismatch() {
-        User otherUser = new User("Outro", "outro@example.com", "hash");
-        ResetPasswordRequestDTO dto = new ResetPasswordRequestDTO("isaac@example.com", "654321", "NovaSenhaForte123!");
-        VerificationToken token = new VerificationToken(otherUser, "654321", TokenType.PASSWORD_RESET, LocalDateTime.now().plusMinutes(30));
+    @DisplayName("Deve lançar BusinessException quando o código for inválido ou bloqueado por tentativas")
+    void resetPassword_ThrowsBusinessException_WhenTokenInvalidOrLocked() {
+        ResetPasswordRequestDTO dto = new ResetPasswordRequestDTO("isaac@example.com", "000000", "NovaSenhaForte123!");
 
-        when(verificationTokenService.validateToken("654321", TokenType.PASSWORD_RESET)).thenReturn(token);
+        when(verificationTokenService.validateTokenWithEmail("isaac@example.com", "000000", TokenType.PASSWORD_RESET))
+                .thenThrow(new BusinessException("Código incorreto. Tentativas restantes: 4"));
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
                 () -> authService.resetPassword(dto)
         );
 
-        assertEquals("O código informado não pertence ao e-mail fornecido.", exception.getMessage());
+        assertEquals("Código incorreto. Tentativas restantes: 4", exception.getMessage());
         verify(userRepository, never()).save(any());
     }
 }

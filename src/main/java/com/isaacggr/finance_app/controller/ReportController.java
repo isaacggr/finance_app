@@ -1,6 +1,7 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.service.BillAlertService;
 import com.isaacggr.finance_app.service.MonthlyReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,9 +21,11 @@ import java.util.Map;
 public class ReportController {
 
     private final MonthlyReportService monthlyReportService;
+    private final BillAlertService billAlertService;
 
-    public ReportController(MonthlyReportService monthlyReportService) {
+    public ReportController(MonthlyReportService monthlyReportService, BillAlertService billAlertService) {
         this.monthlyReportService = monthlyReportService;
+        this.billAlertService = billAlertService;
     }
 
     @PostMapping("/monthly/send-me")
@@ -41,6 +44,24 @@ public class ReportController {
         return ResponseEntity.ok(Map.of(
                 "message", "Relatório financeiro " + periodMessage + " enviado com sucesso para: " + user.getEmail()
         ));
+    }
+
+    @PostMapping("/bill-alerts/send-me")
+    @Operation(
+            summary = "Enviar alerta de contas a vencer por e-mail",
+            description = "Verifica despesas agendadas para vencer nos próximos dias (padrão: 3 dias) e envia um alerta preventivo por e-mail para o usuário autenticado"
+    )
+    public ResponseEntity<Map<String, String>> sendBillAlerts(
+            @RequestParam(required = false, defaultValue = "3") @Parameter(description = "Janela de dias à frente para verificação (1 a 30)", example = "3") Integer days,
+            @AuthenticationPrincipal User user
+    ) {
+        int count = billAlertService.sendAlertsForUser(user, days);
+
+        String message = (count > 0)
+                ? "Alerta enviado com sucesso com " + count + " conta(s) a vencer nos próximos " + days + " dias."
+                : "Você não possui despesas a vencer nos próximos " + days + " dias.";
+
+        return ResponseEntity.ok(Map.of("message", message, "billsFound", String.valueOf(count)));
     }
 }
 
