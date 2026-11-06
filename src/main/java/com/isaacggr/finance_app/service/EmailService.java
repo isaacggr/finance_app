@@ -108,7 +108,7 @@ public class EmailService {
                             <td style="padding: 10px 14px; color: #424242; font-weight: 500;">%s</td>
                             <td style="padding: 10px 14px; text-align: right; font-weight: bold; color: #c62828;">%s</td>
                         </tr>
-                        """.formatted(cat.category().name(), formatCurrency(cat.total())));
+                        """.formatted(cat.category(), formatCurrency(cat.total())));
             }
         }
 
@@ -192,7 +192,7 @@ public class EmailService {
         for (Transaction bill : upcomingBills) {
             String desc = (bill.getDescription() != null && !bill.getDescription().isBlank())
                     ? bill.getDescription()
-                    : bill.getCategory().name();
+                    : bill.getCategory();
 
             billRows.append("""
                     <tr style="border-bottom: 1px solid #f0f0f0;">
@@ -203,7 +203,7 @@ public class EmailService {
                     </tr>
                     """.formatted(
                     desc,
-                    bill.getCategory().name(),
+                    bill.getCategory(),
                     bill.getDate().format(dateFormatter),
                     formatCurrency(bill.getAmount())
             ));

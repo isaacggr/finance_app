@@ -2,7 +2,6 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
@@ -11,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import org.mockito.ArgumentMatchers;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -59,7 +58,7 @@ class TransactionServiceTest {
                 sampleUser,
                 new BigDecimal("150.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.ALIMENTACAO,
+                "ALIMENTACAO",
                 LocalDate.now(),
                 "Almoço de negócios"
         );
@@ -75,7 +74,7 @@ class TransactionServiceTest {
                 sampleUser,
                 new BigDecimal("150.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.ALIMENTACAO,
+                "ALIMENTACAO",
                 LocalDate.now(),
                 "Almoço de negócios"
         );
@@ -83,7 +82,25 @@ class TransactionServiceTest {
         assertNotNull(created);
         assertEquals(new BigDecimal("150.00"), created.getAmount());
         assertEquals(TransactionType.EXPENSE, created.getType());
+        assertEquals("ALIMENTACAO", created.getCategory());
         verify(transactionRepository, times(1)).save(any(Transaction.class));
+    }
+
+    @Test
+    @DisplayName("Deve normalizar categoria em maiúsculas na criação")
+    void create_NormalizesCategory() {
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Transaction created = transactionService.create(
+                sampleUser,
+                new BigDecimal("100.00"),
+                TransactionType.EXPENSE,
+                "  pets e veterinario  ",
+                LocalDate.now(),
+                "Vacina"
+        );
+
+        assertEquals("PETS E VETERINARIO", created.getCategory());
     }
 
     @Test
@@ -93,7 +110,7 @@ class TransactionServiceTest {
                 null,
                 new BigDecimal("100.00"),
                 TransactionType.INCOME,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Depósito"
         ));
@@ -108,7 +125,7 @@ class TransactionServiceTest {
                 sampleUser,
                 new BigDecimal("100.00"),
                 TransactionType.INCOME,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Depósito"
         ));
@@ -121,7 +138,7 @@ class TransactionServiceTest {
                 sampleUser,
                 BigDecimal.ZERO,
                 TransactionType.INCOME,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Depósito"
         ));
@@ -130,16 +147,16 @@ class TransactionServiceTest {
                 sampleUser,
                 new BigDecimal("-50.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.ALIMENTACAO,
+                "ALIMENTACAO",
                 LocalDate.now(),
                 "Despesa"
         ));
     }
 
     @Test
-    @DisplayName("Deve buscar uma transação ativa por ID garantindo pertencimento ao usuário")
+    @DisplayName("Deve buscar uma transação por ID garantindo pertencimento ao usuário")
     void findById_Success() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         Transaction found = transactionService.findById(transactionId, userId);
@@ -151,7 +168,7 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar NotFoundException quando a transação não existir ou pertencer a outro usuário")
     void findById_ThrowsNotFoundException_WhenNotFoundOrBelongsToAnotherUser() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> transactionService.findById(transactionId, userId));
@@ -181,7 +198,7 @@ class TransactionServiceTest {
                 userId,
                 LocalDate.now().minusDays(5),
                 LocalDate.now(),
-                TransactionCategory.ALIMENTACAO,
+                "ALIMENTACAO",
                 TransactionType.EXPENSE,
                 pageable
         );
@@ -208,20 +225,20 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve marcar transação do usuário como deletada com sucesso")
+    @DisplayName("Deve excluir transação do usuário definitivamente (Hard Delete)")
     void delete_Success() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         transactionService.delete(transactionId, userId);
 
-        assertTrue(sampleTransaction.isDeleted());
+        verify(transactionRepository, times(1)).delete(sampleTransaction);
     }
 
     @Test
     @DisplayName("Deve atualizar transação do usuário com sucesso")
     void update_Success() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         LocalDate newDate = LocalDate.now().plusDays(1);
@@ -230,7 +247,7 @@ class TransactionServiceTest {
                 userId,
                 new BigDecimal("299.90"),
                 TransactionType.INCOME,
-                TransactionCategory.INVESTIMENTOS,
+                "INVESTIMENTOS",
                 newDate,
                 "Rendimento de investimentos"
         );
@@ -238,7 +255,7 @@ class TransactionServiceTest {
         assertNotNull(updated);
         assertEquals(new BigDecimal("299.90"), updated.getAmount());
         assertEquals(TransactionType.INCOME, updated.getType());
-        assertEquals(TransactionCategory.INVESTIMENTOS, updated.getCategory());
+        assertEquals("INVESTIMENTOS", updated.getCategory());
         assertEquals(newDate, updated.getDate());
         assertEquals("Rendimento de investimentos", updated.getDescription());
     }
@@ -246,7 +263,7 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar NotFoundException ao tentar atualizar transação inexistente ou de outro usuário")
     void update_ThrowsNotFound_WhenNotFoundOrNotOwned() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> transactionService.update(
@@ -254,7 +271,7 @@ class TransactionServiceTest {
                 userId,
                 new BigDecimal("100.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Atualização"
         ));
@@ -263,7 +280,7 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar ConflictException ao tentar atualizar transação com valor inválido")
     void update_ThrowsConflict_WhenAmountIsZeroOrNegative() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         assertThrows(ConflictException.class, () -> transactionService.update(
@@ -271,7 +288,7 @@ class TransactionServiceTest {
                 userId,
                 BigDecimal.ZERO,
                 TransactionType.EXPENSE,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Atualização"
         ));
@@ -281,7 +298,7 @@ class TransactionServiceTest {
                 userId,
                 new BigDecimal("-10.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now(),
                 "Atualização"
         ));
@@ -290,7 +307,7 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar ConflictException ao tentar atualizar transação sem data")
     void update_ThrowsConflict_WhenDateIsNull() {
-        when(transactionRepository.findByIdAndUserIdAndDeletedFalse(transactionId, userId))
+        when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         assertThrows(ConflictException.class, () -> transactionService.update(
@@ -298,7 +315,7 @@ class TransactionServiceTest {
                 userId,
                 new BigDecimal("50.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 null,
                 "Atualização"
         ));

@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.dto;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 
 import java.math.BigDecimal;
@@ -12,7 +11,7 @@ public record TransactionResponseDTO(
         UUID id,
         BigDecimal amount,
         TransactionType type,
-        TransactionCategory category,
+        String category,
         LocalDate date,
         String description
 ) {

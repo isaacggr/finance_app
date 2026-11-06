@@ -1,6 +1,5 @@
 package com.isaacggr.finance_app.dto;
 
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -11,7 +10,7 @@ public record BudgetProgressDTO(
         UUID id,
 
         @Schema(description = "Categoria da meta", example = "ALIMENTACAO")
-        TransactionCategory category,
+        String category,
 
         @Schema(description = "Valor teto planejado (limite)", example = "800.00")
         BigDecimal budgetAmount,
@@ -29,4 +28,3 @@ public record BudgetProgressDTO(
         boolean exceeded
 ) {
 }
-

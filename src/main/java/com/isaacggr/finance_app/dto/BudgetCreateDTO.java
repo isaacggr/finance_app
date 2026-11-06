@@ -1,15 +1,15 @@
 package com.isaacggr.finance_app.dto;
 
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
 public record BudgetCreateDTO(
-        @Schema(description = "Categoria da despesa para definir o limite", example = "ALIMENTACAO")
-        @NotNull(message = "A categoria é obrigatória")
-        TransactionCategory category,
+        @Schema(description = "Categoria da despesa para definir o limite (ex: ALIMENTACAO, PETS)", example = "ALIMENTACAO")
+        @NotBlank(message = "A categoria é obrigatória")
+        @Size(max = 30, message = "A categoria deve ter no máximo 30 caracteres")
+        String category,
 
         @Schema(description = "Valor teto máximo planejado para a categoria no mês", example = "800.00")
         @NotNull(message = "O valor do orçamento é obrigatório")
@@ -29,4 +29,3 @@ public record BudgetCreateDTO(
         Integer year
 ) {
 }
-

@@ -1,6 +1,5 @@
 package com.isaacggr.finance_app.domain.entity;
 
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -28,9 +27,8 @@ public class Budget {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private TransactionCategory category;
+    private String category;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
@@ -50,9 +48,9 @@ public class Budget {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public Budget(User user, TransactionCategory category, BigDecimal amount, int month, int year) {
+    public Budget(User user, String category, BigDecimal amount, int month, int year) {
         this.user = user;
-        this.category = category;
+        this.category = Transaction.normalizeCategory(category);
         this.amount = amount;
         this.month = month;
         this.year = year;
@@ -83,4 +81,3 @@ public class Budget {
         this.amount = newAmount;
     }
 }
-

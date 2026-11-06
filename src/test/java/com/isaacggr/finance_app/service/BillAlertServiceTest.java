@@ -2,7 +2,6 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -59,7 +58,7 @@ class BillAlertServiceTest {
                 user1,
                 new BigDecimal("120.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.OUTROS,
+                "OUTROS",
                 LocalDate.now().plusDays(2),
                 "Internet Fibra"
         );
@@ -91,7 +90,7 @@ class BillAlertServiceTest {
                 user2,
                 new BigDecimal("250.00"),
                 TransactionType.EXPENSE,
-                TransactionCategory.ALUGUEL,
+                "ALUGUEL",
                 LocalDate.now().plusDays(1),
                 "Energia"
         );

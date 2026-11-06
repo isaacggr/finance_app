@@ -1,8 +1,8 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
+import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.BudgetCreateDTO;
 import com.isaacggr.finance_app.dto.BudgetProgressDTO;
@@ -40,9 +40,11 @@ public class BudgetService {
     // CREATE (Com validação estrita de unicidade)
     // ==========================================
     public BudgetResponseDTO create(UUID userId, User user, BudgetCreateDTO dto) {
+        String normalizedCategory = Transaction.normalizeCategory(dto.category());
+
         boolean exists = budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(
                 userId,
-                dto.category(),
+                normalizedCategory,
                 dto.month(),
                 dto.year()
         );
@@ -53,7 +55,7 @@ public class BudgetService {
 
         Budget budget = new Budget(
                 user,
-                dto.category(),
+                normalizedCategory,
                 dto.amount(),
                 dto.month(),
                 dto.year()
@@ -98,7 +100,7 @@ public class BudgetService {
                 endDate
         );
 
-        Map<TransactionCategory, BigDecimal> spentMap = expenses.stream()
+        Map<String, BigDecimal> spentMap = expenses.stream()
                 .collect(Collectors.toMap(CategoryExpenseDTO::category, CategoryExpenseDTO::total));
 
         // 3. Monta o DTO de progresso calculando o percentual consumido e se estourou a meta
@@ -136,4 +138,3 @@ public class BudgetService {
         budget.markAsDeleted();
     }
 }
-

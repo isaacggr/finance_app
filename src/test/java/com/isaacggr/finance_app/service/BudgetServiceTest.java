@@ -2,7 +2,6 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.BudgetCreateDTO;
 import com.isaacggr.finance_app.dto.BudgetProgressDTO;
@@ -55,16 +54,16 @@ class BudgetServiceTest {
         sampleUser = new User("Isaac Gregorio", "isaac@example.com", "hash123");
         ReflectionTestUtils.setField(sampleUser, "id", userId);
 
-        sampleBudget = new Budget(sampleUser, TransactionCategory.ALIMENTACAO, new BigDecimal("800.00"), 11, 2026);
+        sampleBudget = new Budget(sampleUser, "ALIMENTACAO", new BigDecimal("800.00"), 11, 2026);
         ReflectionTestUtils.setField(sampleBudget, "id", budgetId);
     }
 
     @Test
     @DisplayName("Deve criar um orçamento com sucesso")
     void create_Success() {
-        BudgetCreateDTO dto = new BudgetCreateDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("800.00"), 11, 2026);
+        BudgetCreateDTO dto = new BudgetCreateDTO("ALIMENTACAO", new BigDecimal("800.00"), 11, 2026);
 
-        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, dto.category(), dto.month(), dto.year()))
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, "ALIMENTACAO", dto.month(), dto.year()))
                 .thenReturn(false);
         when(budgetRepository.save(any(Budget.class))).thenReturn(sampleBudget);
 
@@ -81,9 +80,9 @@ class BudgetServiceTest {
     @Test
     @DisplayName("Deve lançar ConflictException quando já existir orçamento para a categoria no mês/ano")
     void create_ThrowsConflictException_WhenAlreadyExists() {
-        BudgetCreateDTO dto = new BudgetCreateDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("800.00"), 11, 2026);
+        BudgetCreateDTO dto = new BudgetCreateDTO("ALIMENTACAO", new BigDecimal("800.00"), 11, 2026);
 
-        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, dto.category(), dto.month(), dto.year()))
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, "ALIMENTACAO", dto.month(), dto.year()))
                 .thenReturn(true);
 
         assertThrows(ConflictException.class, () -> budgetService.create(userId, sampleUser, dto));
@@ -110,7 +109,7 @@ class BudgetServiceTest {
                 .thenReturn(List.of(sampleBudget));
 
         List<CategoryExpenseDTO> expenses = List.of(
-                new CategoryExpenseDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("400.00"))
+                new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("400.00"))
         );
         when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(expenses);
@@ -121,7 +120,7 @@ class BudgetServiceTest {
         assertEquals(1, progressList.size());
 
         BudgetProgressDTO progress = progressList.getFirst();
-        assertEquals(TransactionCategory.ALIMENTACAO, progress.category());
+        assertEquals("ALIMENTACAO", progress.category());
         assertEquals(new BigDecimal("800.00"), progress.budgetAmount());
         assertEquals(new BigDecimal("400.00"), progress.spentAmount());
         assertEquals(new BigDecimal("400.00"), progress.remainingAmount());
@@ -136,7 +135,7 @@ class BudgetServiceTest {
                 .thenReturn(List.of(sampleBudget));
 
         List<CategoryExpenseDTO> expenses = List.of(
-                new CategoryExpenseDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("1000.00"))
+                new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("1000.00"))
         );
         when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(expenses);
@@ -174,4 +173,3 @@ class BudgetServiceTest {
         assertThrows(NotFoundException.class, () -> budgetService.delete(budgetId, userId));
     }
 }
-

@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
@@ -62,7 +61,7 @@ class MonthlyReportServiceTest {
                 new BigDecimal("5000.00"),
                 new BigDecimal("2000.00"),
                 new BigDecimal("3000.00"),
-                List.of(new CategoryExpenseDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("800.00")))
+                List.of(new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("800.00")))
         );
     }
 

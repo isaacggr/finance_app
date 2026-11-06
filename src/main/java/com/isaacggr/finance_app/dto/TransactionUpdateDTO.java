@@ -1,9 +1,9 @@
 package com.isaacggr.finance_app.dto;
 
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -23,9 +23,10 @@ public record TransactionUpdateDTO(
         @NotNull(message = "O tipo da transação é obrigatório")
         TransactionType type,
 
-        @Schema(description = "Nova categoria da transação", example = "ALIMENTACAO")
-        @NotNull(message = "A categoria da transação é obrigatória")
-        TransactionCategory category,
+        @Schema(description = "Nova categoria da transação (livre, ex: ALIMENTACAO, PETS, FARMACIA)", example = "ALIMENTACAO")
+        @NotBlank(message = "A categoria da transação é obrigatória")
+        @Size(max = 30, message = "A categoria deve ter no máximo 30 caracteres")
+        String category,
 
         @Schema(description = "Nova data da transação (formato AAAA-MM-DD)", example = "2026-11-01")
         @NotNull(message = "A data da transação é obrigatória")
@@ -36,4 +37,3 @@ public record TransactionUpdateDTO(
         String description
 ) {
 }
-

@@ -18,14 +18,11 @@ import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID>, JpaSpecificationExecutor<Transaction> {
 
-    // 🔍 Buscar transação ativa por ID e ID do Usuário (Prevenção de IDOR)
-    Optional<Transaction> findByIdAndUserIdAndDeletedFalse(UUID id, UUID userId);
+    // 🔍 Buscar transação por ID e ID do Usuário (Prevenção de IDOR)
+    Optional<Transaction> findByIdAndUserId(UUID id, UUID userId);
 
-    // 🔍 Buscar transação ativa apenas por ID (caso administrativo/geral)
-    Optional<Transaction> findByIdAndDeletedFalse(UUID id);
-
-    // 📄 Listar transações ativas de um usuário (paginação simples legada)
-    Page<Transaction> findByUserIdAndDeletedFalse(UUID userId, Pageable pageable);
+    // 📄 Listar transações de um usuário (paginação simples legada)
+    Page<Transaction> findByUserId(UUID userId, Pageable pageable);
 
     // 📊 Soma total por tipo (INCOME ou EXPENSE) em um intervalo de datas
     @Query("""
@@ -33,7 +30,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
         FROM Transaction t
         WHERE t.user.id = :userId
           AND t.type = :type
-          AND t.deleted = false
           AND t.date >= :startDate
           AND t.date <= :endDate
     """)
@@ -50,7 +46,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
         FROM Transaction t
         WHERE t.user.id = :userId
           AND t.type = :type
-          AND t.deleted = false
           AND t.date >= :startDate
           AND t.date <= :endDate
         GROUP BY t.category
@@ -63,12 +58,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             @Param("endDate") LocalDate endDate
     );
 
-    // 🔔 Buscar despesas ativas com vencimento no intervalo informado (Alertas de Contas a Vencer)
+    // 🔔 Buscar despesas com vencimento no intervalo informado (Alertas de Contas a Vencer)
     @Query("""
         SELECT t FROM Transaction t
         WHERE t.user.id = :userId
           AND t.type = :type
-          AND t.deleted = false
           AND t.date >= :startDate
           AND t.date <= :endDate
         ORDER BY t.date ASC

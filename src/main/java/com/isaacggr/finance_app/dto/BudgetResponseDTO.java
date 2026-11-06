@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.dto;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -12,7 +11,7 @@ public record BudgetResponseDTO(
         UUID id,
 
         @Schema(description = "Categoria da despesa", example = "ALIMENTACAO")
-        TransactionCategory category,
+        String category,
 
         @Schema(description = "Valor teto planejado", example = "800.00")
         BigDecimal amount,
@@ -33,4 +32,3 @@ public record BudgetResponseDTO(
         );
     }
 }
-

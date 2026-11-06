@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.repository.specification;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
@@ -17,15 +16,14 @@ public class TransactionSpecification {
             UUID userId,
             LocalDate startDate,
             LocalDate endDate,
-            TransactionCategory category,
+            String category,
             TransactionType type
     ) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // 🔒 Regras Mandatórias de Segurança (Zero IDOR e exclusão lógica)
+            // 🔒 Regra Mandatória de Segurança (Zero IDOR)
             predicates.add(builder.equal(root.get("user").get("id"), userId));
-            predicates.add(builder.isFalse(root.get("deleted")));
 
             // 📅 Filtros Opcionais por Período
             if (startDate != null) {
@@ -35,9 +33,9 @@ public class TransactionSpecification {
                 predicates.add(builder.lessThanOrEqualTo(root.get("date"), endDate));
             }
 
-            // 🏷️ Filtro Opcional por Categoria
-            if (category != null) {
-                predicates.add(builder.equal(root.get("category"), category));
+            // 🏷️ Filtro Opcional por Categoria (Normalizada em maiúsculo)
+            if (category != null && !category.isBlank()) {
+                predicates.add(builder.equal(root.get("category"), Transaction.normalizeCategory(category)));
             }
 
             // 🔀 Filtro Opcional por Tipo (INCOME / EXPENSE)

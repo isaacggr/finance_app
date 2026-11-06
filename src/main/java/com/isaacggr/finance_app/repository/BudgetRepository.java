@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.repository;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -19,9 +18,8 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
     // 🔒 Verificar se já existe orçamento ativo para a mesma categoria no mesmo mês/ano
     boolean existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(
             UUID userId,
-            TransactionCategory category,
+            String category,
             int month,
             int year
     );
 }
-

@@ -2,7 +2,6 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.PageResponseDTO;
 import com.isaacggr.finance_app.dto.TransactionCreateDTO;
@@ -36,7 +35,7 @@ public class TransactionController {
 
     // ✅ Criar transação (associada automaticamente ao usuário logado)
     @PostMapping
-    @Operation(summary = "Criar transação", description = "Cria uma nova receita ou despesa associada ao usuário autenticado")
+    @Operation(summary = "Criar transação", description = "Cria uma nova receita ou despesa associada ao usuário autenticado com categoria flexível")
     public ResponseEntity<TransactionResponseDTO> create(
             @RequestBody @Valid TransactionCreateDTO dto,
             @AuthenticationPrincipal User user
@@ -61,7 +60,7 @@ public class TransactionController {
     public ResponseEntity<PageResponseDTO<TransactionResponseDTO>> list(
             @RequestParam(required = false) @Parameter(description = "Data inicial (AAAA-MM-DD)", example = "2026-11-01") LocalDate startDate,
             @RequestParam(required = false) @Parameter(description = "Data final (AAAA-MM-DD)", example = "2026-11-30") LocalDate endDate,
-            @RequestParam(required = false) @Parameter(description = "Categoria da transação", example = "ALIMENTACAO") TransactionCategory category,
+            @RequestParam(required = false) @Parameter(description = "Categoria da transação (ex: ALIMENTACAO, PETS)", example = "ALIMENTACAO") String category,
             @RequestParam(required = false) @Parameter(description = "Tipo da transação (INCOME ou EXPENSE)", example = "EXPENSE") TransactionType type,
             @AuthenticationPrincipal User user,
             Pageable pageable
@@ -108,9 +107,9 @@ public class TransactionController {
         return ResponseEntity.ok(TransactionResponseDTO.fromEntity(updated));
     }
 
-    // ✅ Soft delete (apenas se pertencer ao usuário autenticado)
+    // ✅ Hard delete definitivo (apenas se pertencer ao usuário autenticado)
     @DeleteMapping("/{transactionId}")
-    @Operation(summary = "Excluir transação", description = "Exclui logicamente uma transação pertencente ao usuário autenticado")
+    @Operation(summary = "Excluir transação", description = "Exclui fisicamente e em definitivo uma transação pertencente ao usuário autenticado (Hard Delete)")
     public ResponseEntity<Void> delete(
             @PathVariable @Parameter(description = "Identificador único (UUID) da transação", example = "05498412-beb1-4060-ae2a-74152f144619") UUID transactionId,
             @AuthenticationPrincipal User user

@@ -2,7 +2,6 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
@@ -35,7 +34,7 @@ public class TransactionService {
             User user,
             BigDecimal amount,
             TransactionType type,
-            TransactionCategory category,
+            String category,
             LocalDate date,
             String description
     ) {
@@ -69,7 +68,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public Transaction findById(UUID transactionId, UUID userId) {
         return transactionRepository
-                .findByIdAndUserIdAndDeletedFalse(transactionId, userId)
+                .findByIdAndUserId(transactionId, userId)
                 .orElseThrow(() -> new NotFoundException("Transação não encontrada"));
     }
 
@@ -81,7 +80,7 @@ public class TransactionService {
             UUID userId,
             LocalDate startDate,
             LocalDate endDate,
-            TransactionCategory category,
+            String category,
             TransactionType type,
             Pageable pageable
     ) {
@@ -113,7 +112,7 @@ public class TransactionService {
             UUID userId,
             BigDecimal amount,
             TransactionType type,
-            TransactionCategory category,
+            String category,
             LocalDate date,
             String description
     ) {
@@ -132,10 +131,10 @@ public class TransactionService {
     }
 
     // ======================
-    // DELETE (Soft delete da transação do usuário)
+    // DELETE (Hard delete definitivo da transação do usuário)
     // ======================
     public void delete(UUID transactionId, UUID userId) {
         Transaction transaction = findById(transactionId, userId);
-        transaction.markAsDeleted();
+        transactionRepository.delete(transaction);
     }
 }

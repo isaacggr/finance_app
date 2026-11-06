@@ -1,6 +1,5 @@
 package com.isaacggr.finance_app.service;
 
-import com.isaacggr.finance_app.domain.enums.TransactionCategory;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
@@ -53,8 +52,8 @@ class DashboardServiceTest {
                 .thenReturn(new BigDecimal("2100.50"));
 
         List<CategoryExpenseDTO> categories = List.of(
-                new CategoryExpenseDTO(TransactionCategory.ALIMENTACAO, new BigDecimal("1500.00")),
-                new CategoryExpenseDTO(TransactionCategory.TRANSPORTE, new BigDecimal("600.50"))
+                new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("1500.00")),
+                new CategoryExpenseDTO("TRANSPORTE", new BigDecimal("600.50"))
         );
         when(transactionRepository.sumAmountByCategory(userId, TransactionType.EXPENSE, startDate, endDate))
                 .thenReturn(categories);
