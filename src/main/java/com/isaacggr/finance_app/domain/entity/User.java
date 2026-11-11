@@ -14,6 +14,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
+    public static final int ACCOUNT_RETENTION_DAYS = 30;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false, updatable = false)
@@ -33,6 +35,9 @@ public class User {
 
     @Column(nullable = false)
     private boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -77,6 +82,19 @@ public class User {
 
     public void markAsDeleted() {
         this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean canReactivate(LocalDateTime referenceTime) {
+        if (!this.deleted || this.deletedAt == null) {
+            return false;
+        }
+        return !this.deletedAt.plusDays(ACCOUNT_RETENTION_DAYS).isBefore(referenceTime);
+    }
+
+    public void reactivate() {
+        this.deleted = false;
+        this.deletedAt = null;
     }
 
     public void changeName(String name) {

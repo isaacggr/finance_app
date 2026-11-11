@@ -16,6 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @Transactional(readOnly = true)
 public class AuthService {
@@ -43,12 +45,16 @@ public class AuthService {
         this.expirationMillis = expirationMillis;
     }
 
+    @Transactional
     public LoginResponseDTO login(LoginRequestDTO dto) {
         User user = userRepository.findByEmail(dto.email())
-                .filter(User::isActive)
                 .orElseThrow(() -> new UnauthorizedException("Credenciais inválidas"));
 
         if (!passwordEncoder.matches(dto.password(), user.getPasswordHash())) {
+            throw new UnauthorizedException("Credenciais inválidas");
+        }
+
+        if (user.isDeleted() && !user.canReactivate(LocalDateTime.now())) {
             throw new UnauthorizedException("Credenciais inválidas");
         }
 
@@ -57,8 +63,17 @@ public class AuthService {
             throw new ForbiddenException("Por favor, confirme seu e-mail antes de efetuar login.");
         }
 
+        boolean reactivated = false;
+        if (user.isDeleted()) {
+            user.reactivate();
+            userRepository.save(user);
+            reactivated = true;
+        }
+
         String token = tokenService.generateToken(user);
-        return LoginResponseDTO.of(token, expirationMillis);
+        return reactivated
+                ? LoginResponseDTO.reactivated(token, expirationMillis)
+                : LoginResponseDTO.of(token, expirationMillis);
     }
 
     // ==========================================

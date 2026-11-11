@@ -1,8 +1,12 @@
 package com.isaacggr.finance_app.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +22,8 @@ import com.isaacggr.finance_app.repository.UserRepository;
 @Service
 @Transactional
 public class UserService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -45,7 +51,9 @@ public class UserService {
             if (user.isActive()) {
                 throw new ConflictException("Email já cadastrado");
             } else {
-                throw new ConflictException("Existe uma conta desativada com este email");
+                throw new ConflictException(
+                        "Existe uma conta desativada com este email. Faça login em até 30 dias para reativá-la ou aguarde a exclusão definitiva."
+                );
             }
         });
 
@@ -79,6 +87,22 @@ public class UserService {
         }
 
         user.markAsDeleted();
+        userRepository.save(user);
+    }
+
+    // ======================
+    // EXPURGO DEFINITIVO APÓS 30 DIAS (LGPD)
+    // Executa diariamente às 04:00 da manhã
+    // ======================
+    @Scheduled(cron = "0 0 4 * * ?")
+    public int purgeExpiredDeletedUsers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(User.ACCOUNT_RETENTION_DAYS);
+        int purgedCount = userRepository.deleteDeletedUsersBefore(cutoff);
+        if (purgedCount > 0) {
+            log.info("🧹 [EXPURGO LGPD] {} conta(s) excluída(s) definitivamente após {} dias de retenção.",
+                    purgedCount, User.ACCOUNT_RETENTION_DAYS);
+        }
+        return purgedCount;
     }
 
     // ======================

@@ -12,13 +12,17 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -49,8 +53,14 @@ public class TransactionController {
                 dto.description()
         );
 
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(transaction.getId())
+                .toUri();
+
         return ResponseEntity
-                .status(HttpStatus.CREATED)
+                .created(location)
                 .body(TransactionResponseDTO.fromEntity(transaction));
     }
 
@@ -63,7 +73,7 @@ public class TransactionController {
             @RequestParam(required = false) @Parameter(description = "Categoria da transação (ex: ALIMENTACAO, PETS)", example = "ALIMENTACAO") String category,
             @RequestParam(required = false) @Parameter(description = "Tipo da transação (INCOME ou EXPENSE)", example = "EXPENSE") TransactionType type,
             @AuthenticationPrincipal User user,
-            Pageable pageable
+            @ParameterObject @PageableDefault(size = 15, sort = "date", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Page<TransactionResponseDTO> page = transactionService
                 .listByUser(user.getId(), startDate, endDate, category, type, pageable)

@@ -8,13 +8,17 @@ import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.specification.TransactionSpecification;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -96,7 +100,33 @@ public class TransactionService {
                 type
         );
 
-        return transactionRepository.findAll(spec, pageable);
+        return transactionRepository.findAll(spec, withStableSort(pageable));
+    }
+
+    private Pageable withStableSort(Pageable pageable) {
+        if (pageable == null) {
+            return PageRequest.of(0, 15, Sort.by(Sort.Order.desc("date"), Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        }
+        if (pageable.isUnpaged()) {
+            return pageable;
+        }
+
+        List<Sort.Order> orders = new ArrayList<>();
+        Sort currentSort = pageable.getSort();
+        if (currentSort.isUnsorted()) {
+            orders.add(Sort.Order.desc("date"));
+        } else {
+            currentSort.forEach(orders::add);
+        }
+
+        if (currentSort.getOrderFor("createdAt") == null) {
+            orders.add(Sort.Order.desc("createdAt"));
+        }
+        if (currentSort.getOrderFor("id") == null) {
+            orders.add(Sort.Order.desc("id"));
+        }
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(orders));
     }
 
     @Transactional(readOnly = true)

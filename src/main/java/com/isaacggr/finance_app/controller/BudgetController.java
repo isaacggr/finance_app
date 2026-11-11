@@ -4,16 +4,18 @@ import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.dto.BudgetCreateDTO;
 import com.isaacggr.finance_app.dto.BudgetProgressDTO;
 import com.isaacggr.finance_app.dto.BudgetResponseDTO;
+import com.isaacggr.finance_app.dto.BudgetUpdateDTO;
 import com.isaacggr.finance_app.service.BudgetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,7 +38,12 @@ public class BudgetController {
             @AuthenticationPrincipal User user
     ) {
         BudgetResponseDTO response = budgetService.create(user.getId(), user, dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(response.id())
+                .toUri();
+        return ResponseEntity.created(location).body(response);
     }
 
     // ✅ Listar orçamentos do período
@@ -61,9 +68,20 @@ public class BudgetController {
         return ResponseEntity.ok(budgetService.getProgress(user.getId(), month, year));
     }
 
-    // ✅ Excluir orçamento (Soft delete com Zero IDOR)
+    // ✅ Atualizar orçamento existente do usuário autenticado (Zero IDOR)
+    @PutMapping("/{id}")
+    @Operation(summary = "Atualizar orçamento", description = "Atualiza o valor teto e opcionalmente categoria, mês ou ano de um orçamento do usuário autenticado")
+    public ResponseEntity<BudgetResponseDTO> update(
+            @PathVariable @Parameter(description = "Identificador único (UUID) do orçamento", example = "6fa85f64-5717-4562-b3fc-2c963f66afa6") UUID id,
+            @RequestBody @Valid BudgetUpdateDTO dto,
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(budgetService.update(id, user.getId(), dto));
+    }
+
+    // ✅ Excluir orçamento (Hard delete definitivo com Zero IDOR)
     @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir orçamento", description = "Realiza a exclusão lógica (soft delete) de um orçamento pertencente ao usuário autenticado")
+    @Operation(summary = "Excluir orçamento", description = "Exclui fisicamente e em definitivo um orçamento pertencente ao usuário autenticado (Hard Delete)")
     public ResponseEntity<Void> delete(
             @PathVariable @Parameter(description = "Identificador único (UUID) do orçamento", example = "6fa85f64-5717-4562-b3fc-2c963f66afa6") UUID id,
             @AuthenticationPrincipal User user

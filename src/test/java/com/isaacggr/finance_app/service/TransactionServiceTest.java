@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -175,10 +177,15 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve listar transações do usuário de forma paginada")
+    @DisplayName("Deve listar transações do usuário de forma paginada com ordenação estável padrão")
     void listByUser_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable)))
+        Pageable expectedPageable = PageRequest.of(
+                0,
+                10,
+                Sort.by(Sort.Order.desc("date"), Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(expectedPageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(userId, pageable);
@@ -191,7 +198,12 @@ class TransactionServiceTest {
     @DisplayName("Deve listar transações com filtros de período, categoria e tipo")
     void listByUser_WithFilters_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(pageable)))
+        Pageable expectedPageable = PageRequest.of(
+                0,
+                10,
+                Sort.by(Sort.Order.desc("date"), Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(expectedPageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
         Page<Transaction> result = transactionService.listByUser(
@@ -205,6 +217,36 @@ class TransactionServiceTest {
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    @DisplayName("Deve preservar ordenação customizada e acrescentar desempate estável (createdAt desc, id desc)")
+    void listByUser_PreservesCustomSortAndAppendsTieBreakers() {
+        Pageable customPageable = PageRequest.of(1, 20, Sort.by(Sort.Order.asc("amount")));
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
+
+        transactionService.listByUser(userId, customPageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(transactionRepository).findAll(ArgumentMatchers.<Specification<Transaction>>any(), pageableCaptor.capture());
+
+        Pageable usedPageable = pageableCaptor.getValue();
+        assertEquals(1, usedPageable.getPageNumber());
+        assertEquals(20, usedPageable.getPageSize());
+        assertEquals(
+                Sort.by(Sort.Order.asc("amount"), Sort.Order.desc("createdAt"), Sort.Order.desc("id")),
+                usedPageable.getSort()
+        );
+    }
+
+    @Test
+    @DisplayName("Deve normalizar valores monetários com escala 2 usando RoundingMode.HALF_EVEN")
+    void normalizeMonetaryAmount_UsesHalfEvenScale2() {
+        assertEquals(new BigDecimal("10.00"), Transaction.normalizeMonetaryAmount(new BigDecimal("10.005")));
+        assertEquals(new BigDecimal("10.02"), Transaction.normalizeMonetaryAmount(new BigDecimal("10.015")));
+        assertEquals(new BigDecimal("89.90"), Transaction.normalizeMonetaryAmount(new BigDecimal("89.9")));
+        assertNull(Transaction.normalizeMonetaryAmount(null));
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.BudgetCreateDTO;
 import com.isaacggr.finance_app.dto.BudgetProgressDTO;
 import com.isaacggr.finance_app.dto.BudgetResponseDTO;
+import com.isaacggr.finance_app.dto.BudgetUpdateDTO;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
@@ -42,7 +43,7 @@ public class BudgetService {
     public BudgetResponseDTO create(UUID userId, User user, BudgetCreateDTO dto) {
         String normalizedCategory = Transaction.normalizeCategory(dto.category());
 
-        boolean exists = budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(
+        boolean exists = budgetRepository.existsByUserIdAndCategoryAndMonthAndYear(
                 userId,
                 normalizedCategory,
                 dto.month(),
@@ -72,7 +73,7 @@ public class BudgetService {
         int effectiveMonth = (month != null) ? month : LocalDate.now().getMonthValue();
         int effectiveYear = (year != null) ? year : LocalDate.now().getYear();
 
-        return budgetRepository.findByUserIdAndMonthAndYearAndDeletedFalse(userId, effectiveMonth, effectiveYear)
+        return budgetRepository.findByUserIdAndMonthAndYear(userId, effectiveMonth, effectiveYear)
                 .stream()
                 .map(BudgetResponseDTO::fromEntity)
                 .toList();
@@ -90,7 +91,7 @@ public class BudgetService {
         LocalDate endDate = startDate.with(TemporalAdjusters.lastDayOfMonth());
 
         // 1. Busca todos os orçamentos definidos pelo usuário para o mês
-        List<Budget> budgets = budgetRepository.findByUserIdAndMonthAndYearAndDeletedFalse(userId, effectiveMonth, effectiveYear);
+        List<Budget> budgets = budgetRepository.findByUserIdAndMonthAndYear(userId, effectiveMonth, effectiveYear);
 
         // 2. Busca todas as despesas reais agrupadas por categoria em 1 única query rápida no MySQL
         List<CategoryExpenseDTO> expenses = transactionRepository.sumAmountByCategory(
@@ -105,13 +106,15 @@ public class BudgetService {
 
         // 3. Monta o DTO de progresso calculando o percentual consumido e se estourou a meta
         return budgets.stream().map(budget -> {
-            BigDecimal spent = spentMap.getOrDefault(budget.getCategory(), BigDecimal.ZERO);
-            BigDecimal remaining = budget.getAmount().subtract(spent);
+            BigDecimal spent = Transaction.normalizeMonetaryAmount(
+                    spentMap.getOrDefault(budget.getCategory(), BigDecimal.ZERO)
+            );
+            BigDecimal remaining = Transaction.normalizeMonetaryAmount(budget.getAmount().subtract(spent));
 
-            BigDecimal percentageUsed = BigDecimal.ZERO;
+            BigDecimal percentageUsed = Transaction.normalizeMonetaryAmount(BigDecimal.ZERO);
             if (budget.getAmount().compareTo(BigDecimal.ZERO) > 0) {
                 percentageUsed = spent.multiply(BigDecimal.valueOf(100))
-                        .divide(budget.getAmount(), 2, RoundingMode.HALF_UP);
+                        .divide(budget.getAmount(), 2, RoundingMode.HALF_EVEN);
             }
 
             boolean exceeded = spent.compareTo(budget.getAmount()) > 0;
@@ -129,12 +132,47 @@ public class BudgetService {
     }
 
     // ==========================================
-    // DELETE (Soft delete com proteção Zero IDOR)
+    // UPDATE (Atualiza orçamento sem IDOR e validando unicidade)
     // ==========================================
-    public void delete(UUID id, UUID userId) {
-        Budget budget = budgetRepository.findByIdAndUserIdAndDeletedFalse(id, userId)
+    public BudgetResponseDTO update(UUID id, UUID userId, BudgetUpdateDTO dto) {
+        Budget budget = budgetRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new NotFoundException("Orçamento não encontrado"));
 
-        budget.markAsDeleted();
+        String targetCategory = (dto.category() != null)
+                ? Transaction.normalizeCategory(dto.category())
+                : budget.getCategory();
+        int targetMonth = (dto.month() != null) ? dto.month() : budget.getMonth();
+        int targetYear = (dto.year() != null) ? dto.year() : budget.getYear();
+
+        boolean keyChanged = !targetCategory.equals(budget.getCategory())
+                || targetMonth != budget.getMonth()
+                || targetYear != budget.getYear();
+
+        if (keyChanged) {
+            boolean duplicate = budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndIdNot(
+                    userId,
+                    targetCategory,
+                    targetMonth,
+                    targetYear,
+                    id
+            );
+
+            if (duplicate) {
+                throw new ConflictException("Já existe um orçamento ativo para esta categoria neste mês/ano");
+            }
+        }
+
+        budget.update(targetCategory, dto.amount(), targetMonth, targetYear);
+        return BudgetResponseDTO.fromEntity(budgetRepository.save(budget));
+    }
+
+    // ==========================================
+    // DELETE (Hard Delete definitivo com proteção Zero IDOR)
+    // ==========================================
+    public void delete(UUID id, UUID userId) {
+        Budget budget = budgetRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new NotFoundException("Orçamento não encontrado"));
+
+        budgetRepository.delete(budget);
     }
 }

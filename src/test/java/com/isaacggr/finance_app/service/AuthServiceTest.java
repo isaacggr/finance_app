@@ -80,6 +80,7 @@ class AuthServiceTest {
         assertEquals("fake.jwt.token", response.token());
         assertEquals("Bearer", response.type());
         assertEquals(expiration, response.expiresIn());
+        assertNull(response.reactivated());
         verify(tokenService).generateToken(sampleUser);
     }
 
@@ -136,12 +137,33 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar UnauthorizedException quando o usuário estiver desativado/deletado")
-    void login_ThrowsUnauthorized_WhenUserIsDeleted() {
+    @DisplayName("Deve reativar automaticamente a conta quando usuário excluído logar dentro de 30 dias com senha válida")
+    void login_ReactivatesDeletedUser_WhenWithin30DaysAndValidPassword() {
         LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "plainPassword123");
         sampleUser.markAsDeleted();
 
         when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(true);
+        when(tokenService.generateToken(sampleUser)).thenReturn("reactivated.jwt.token");
+
+        LoginResponseDTO response = authService.login(dto);
+
+        assertFalse(sampleUser.isDeleted());
+        assertNull(sampleUser.getDeletedAt());
+        assertTrue(Boolean.TRUE.equals(response.reactivated()));
+        assertEquals("reactivated.jwt.token", response.token());
+        verify(userRepository).save(sampleUser);
+        verify(tokenService).generateToken(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve lançar UnauthorizedException e não reativar conta excluída se a senha estiver incorreta")
+    void login_ThrowsUnauthorizedAndDoesNotReactivate_WhenDeletedUserPasswordWrong() {
+        LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "wrongPassword");
+        sampleUser.markAsDeleted();
+
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(false);
 
         UnauthorizedException exception = assertThrows(
                 UnauthorizedException.class,
@@ -149,6 +171,30 @@ class AuthServiceTest {
         );
 
         assertEquals("Credenciais inválidas", exception.getMessage());
+        assertTrue(sampleUser.isDeleted());
+        assertNotNull(sampleUser.getDeletedAt());
+        verify(userRepository, never()).save(any());
+        verify(tokenService, never()).generateToken(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar UnauthorizedException quando conta foi excluída há mais de 30 dias")
+    void login_ThrowsUnauthorized_WhenUserDeletedOver30DaysAgo() {
+        LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "plainPassword123");
+        sampleUser.markAsDeleted();
+        ReflectionTestUtils.setField(sampleUser, "deletedAt", LocalDateTime.now().minusDays(31));
+
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(true);
+
+        UnauthorizedException exception = assertThrows(
+                UnauthorizedException.class,
+                () -> authService.login(dto)
+        );
+
+        assertEquals("Credenciais inválidas", exception.getMessage());
+        assertTrue(sampleUser.isDeleted());
+        verify(userRepository, never()).save(any());
         verify(tokenService, never()).generateToken(any());
     }
 

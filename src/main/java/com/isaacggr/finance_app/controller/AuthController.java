@@ -27,7 +27,10 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Realizar login", description = "Autentica o usuário com e-mail e senha e retorna o token JWT")
+    @Operation(
+            summary = "Realizar login",
+            description = "Autentica o usuário com e-mail e senha e retorna o token JWT. Se a conta tiver sido excluída há no máximo 30 dias, ela é reativada automaticamente no login."
+    )
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
         LoginResponseDTO response = authService.login(dto);
         return ResponseEntity.ok(response);

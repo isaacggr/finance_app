@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -62,7 +63,7 @@ public class Transaction {
             String description) {
 
         this.user = user;
-        this.amount = amount;
+        this.amount = normalizeMonetaryAmount(amount);
         this.type = type;
         this.category = normalizeCategory(category);
         this.date = date;
@@ -94,11 +95,18 @@ public class Transaction {
             LocalDate date,
             String description) {
 
-        this.amount = amount;
+        this.amount = normalizeMonetaryAmount(amount);
         this.type = type;
         this.category = normalizeCategory(category);
         this.date = date;
         this.description = description;
+    }
+
+    public static BigDecimal normalizeMonetaryAmount(BigDecimal amount) {
+        if (amount == null) {
+            return null;
+        }
+        return amount.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     public static String normalizeCategory(String category) {

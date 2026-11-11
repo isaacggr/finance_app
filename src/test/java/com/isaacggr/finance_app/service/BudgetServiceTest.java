@@ -6,6 +6,7 @@ import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.BudgetCreateDTO;
 import com.isaacggr.finance_app.dto.BudgetProgressDTO;
 import com.isaacggr.finance_app.dto.BudgetResponseDTO;
+import com.isaacggr.finance_app.dto.BudgetUpdateDTO;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
@@ -63,7 +64,7 @@ class BudgetServiceTest {
     void create_Success() {
         BudgetCreateDTO dto = new BudgetCreateDTO("ALIMENTACAO", new BigDecimal("800.00"), 11, 2026);
 
-        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, "ALIMENTACAO", dto.month(), dto.year()))
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYear(userId, "ALIMENTACAO", dto.month(), dto.year()))
                 .thenReturn(false);
         when(budgetRepository.save(any(Budget.class))).thenReturn(sampleBudget);
 
@@ -82,7 +83,7 @@ class BudgetServiceTest {
     void create_ThrowsConflictException_WhenAlreadyExists() {
         BudgetCreateDTO dto = new BudgetCreateDTO("ALIMENTACAO", new BigDecimal("800.00"), 11, 2026);
 
-        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(userId, "ALIMENTACAO", dto.month(), dto.year()))
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYear(userId, "ALIMENTACAO", dto.month(), dto.year()))
                 .thenReturn(true);
 
         assertThrows(ConflictException.class, () -> budgetService.create(userId, sampleUser, dto));
@@ -92,7 +93,7 @@ class BudgetServiceTest {
     @Test
     @DisplayName("Deve listar orçamentos do período com sucesso")
     void listByPeriod_Success() {
-        when(budgetRepository.findByUserIdAndMonthAndYearAndDeletedFalse(userId, 11, 2026))
+        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
                 .thenReturn(List.of(sampleBudget));
 
         List<BudgetResponseDTO> result = budgetService.listByPeriod(userId, 11, 2026);
@@ -105,7 +106,7 @@ class BudgetServiceTest {
     @Test
     @DisplayName("Deve calcular progresso do orçamento dentro do limite com sucesso")
     void getProgress_Success_WithinBudget() {
-        when(budgetRepository.findByUserIdAndMonthAndYearAndDeletedFalse(userId, 11, 2026))
+        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
                 .thenReturn(List.of(sampleBudget));
 
         List<CategoryExpenseDTO> expenses = List.of(
@@ -131,7 +132,7 @@ class BudgetServiceTest {
     @Test
     @DisplayName("Deve calcular progresso do orçamento quando estourar o limite")
     void getProgress_Success_ExceededBudget() {
-        when(budgetRepository.findByUserIdAndMonthAndYearAndDeletedFalse(userId, 11, 2026))
+        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
                 .thenReturn(List.of(sampleBudget));
 
         List<CategoryExpenseDTO> expenses = List.of(
@@ -154,20 +155,99 @@ class BudgetServiceTest {
     }
 
     @Test
-    @DisplayName("Deve excluir logicamente o orçamento com sucesso")
+    @DisplayName("Deve atualizar apenas o valor do orçamento existente mantendo categoria e período")
+    void update_Success_AmountOnly() {
+        BudgetUpdateDTO dto = new BudgetUpdateDTO(null, new BigDecimal("1200.0"), null, null);
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
+                .thenReturn(Optional.of(sampleBudget));
+        when(budgetRepository.save(sampleBudget)).thenReturn(sampleBudget);
+
+        BudgetResponseDTO response = budgetService.update(budgetId, userId, dto);
+
+        assertEquals("ALIMENTACAO", response.category());
+        assertEquals(new BigDecimal("1200.00"), response.amount());
+        assertEquals(11, response.month());
+        assertEquals(2026, response.year());
+        verify(budgetRepository, never()).existsByUserIdAndCategoryAndMonthAndYearAndIdNot(any(), any(), anyInt(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("Deve atualizar categoria e período do orçamento quando não houver conflito")
+    void update_Success_ChangingCategoryAndPeriod() {
+        BudgetUpdateDTO dto = new BudgetUpdateDTO("transporte", new BigDecimal("550.00"), 12, 2026);
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
+                .thenReturn(Optional.of(sampleBudget));
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndIdNot(
+                userId, "TRANSPORTE", 12, 2026, budgetId))
+                .thenReturn(false);
+        when(budgetRepository.save(sampleBudget)).thenReturn(sampleBudget);
+
+        BudgetResponseDTO response = budgetService.update(budgetId, userId, dto);
+
+        assertEquals("TRANSPORTE", response.category());
+        assertEquals(new BigDecimal("550.00"), response.amount());
+        assertEquals(12, response.month());
+        assertEquals(2026, response.year());
+        verify(budgetRepository).save(sampleBudget);
+    }
+
+    @Test
+    @DisplayName("Deve lançar ConflictException ao atualizar orçamento para chave já ocupada por outro orçamento")
+    void update_ThrowsConflict_WhenTargetKeyAlreadyExists() {
+        BudgetUpdateDTO dto = new BudgetUpdateDTO("transporte", new BigDecimal("500.00"), 11, 2026);
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
+                .thenReturn(Optional.of(sampleBudget));
+        when(budgetRepository.existsByUserIdAndCategoryAndMonthAndYearAndIdNot(
+                userId, "TRANSPORTE", 11, 2026, budgetId))
+                .thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> budgetService.update(budgetId, userId, dto));
+        verify(budgetRepository, never()).save(any(Budget.class));
+    }
+
+    @Test
+    @DisplayName("Deve lançar NotFoundException ao tentar atualizar orçamento inexistente ou de outro usuário")
+    void update_ThrowsNotFound_WhenNotFoundOrNotOwned() {
+        BudgetUpdateDTO dto = new BudgetUpdateDTO(null, new BigDecimal("500.00"), null, null);
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> budgetService.update(budgetId, userId, dto));
+    }
+
+    @Test
+    @DisplayName("Deve incluir orçamentos com zero gasto no progresso com valores normalizados em escala 2")
+    void getProgress_IncludesZeroSpentBudgets() {
+        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
+                .thenReturn(List.of(sampleBudget));
+        when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        List<BudgetProgressDTO> progressList = budgetService.getProgress(userId, 11, 2026);
+
+        assertEquals(1, progressList.size());
+        BudgetProgressDTO progress = progressList.getFirst();
+        assertEquals(new BigDecimal("0.00"), progress.spentAmount());
+        assertEquals(new BigDecimal("800.00"), progress.remainingAmount());
+        assertEquals(new BigDecimal("0.00"), progress.percentageUsed());
+        assertFalse(progress.exceeded());
+    }
+
+    @Test
+    @DisplayName("Deve excluir fisicamente o orçamento com sucesso (Hard Delete)")
     void delete_Success() {
-        when(budgetRepository.findByIdAndUserIdAndDeletedFalse(budgetId, userId))
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
                 .thenReturn(Optional.of(sampleBudget));
 
         budgetService.delete(budgetId, userId);
 
-        assertTrue(sampleBudget.isDeleted());
+        verify(budgetRepository, times(1)).delete(sampleBudget);
     }
 
     @Test
     @DisplayName("Deve lançar NotFoundException ao tentar excluir orçamento inexistente ou de outro usuário")
     void delete_ThrowsNotFound_WhenNotFoundOrNotOwned() {
-        when(budgetRepository.findByIdAndUserIdAndDeletedFalse(budgetId, userId))
+        when(budgetRepository.findByIdAndUserId(budgetId, userId))
                 .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> budgetService.delete(budgetId, userId));

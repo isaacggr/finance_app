@@ -10,16 +10,25 @@ import java.util.UUID;
 public interface BudgetRepository extends JpaRepository<Budget, UUID> {
 
     // 🔍 Buscar por ID e ID do Usuário (Prevenção estrita de IDOR)
-    Optional<Budget> findByIdAndUserIdAndDeletedFalse(UUID id, UUID userId);
+    Optional<Budget> findByIdAndUserId(UUID id, UUID userId);
 
-    // 📅 Listar todos os orçamentos ativos do usuário para um determinado mês e ano
-    List<Budget> findByUserIdAndMonthAndYearAndDeletedFalse(UUID userId, int month, int year);
+    // 📅 Listar todos os orçamentos do usuário para um determinado mês e ano
+    List<Budget> findByUserIdAndMonthAndYear(UUID userId, int month, int year);
 
-    // 🔒 Verificar se já existe orçamento ativo para a mesma categoria no mesmo mês/ano
-    boolean existsByUserIdAndCategoryAndMonthAndYearAndDeletedFalse(
+    // 🔒 Verificar se já existe orçamento para a mesma categoria no mesmo mês/ano
+    boolean existsByUserIdAndCategoryAndMonthAndYear(
             UUID userId,
             String category,
             int month,
             int year
+    );
+
+    // 🔒 Verificar conflito de unicidade ao atualizar orçamento (ignorando o próprio ID)
+    boolean existsByUserIdAndCategoryAndMonthAndYearAndIdNot(
+            UUID userId,
+            String category,
+            int month,
+            int year,
+            UUID id
     );
 }

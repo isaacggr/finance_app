@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -118,7 +119,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Deve marcar o usuário como deletado com sucesso")
+    @DisplayName("Deve marcar o usuário como deletado com carimbo temporal de retenção de 30 dias")
     void delete_Success() {
         UUID id = UUID.randomUUID();
         when(userRepository.findById(id)).thenReturn(Optional.of(sampleUser));
@@ -126,6 +127,26 @@ class UserServiceTest {
         userService.delete(id);
 
         assertTrue(sampleUser.isDeleted());
+        assertNotNull(sampleUser.getDeletedAt());
+        verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve expurgar definitivamente usuários desativados há mais de 30 dias")
+    void purgeExpiredDeletedUsers_DeletesAccountsOlderThan30Days() {
+        when(userRepository.deleteDeletedUsersBefore(any(LocalDateTime.class))).thenReturn(2);
+
+        LocalDateTime beforeCall = LocalDateTime.now();
+        int purged = userService.purgeExpiredDeletedUsers();
+        LocalDateTime afterCall = LocalDateTime.now();
+
+        ArgumentCaptor<LocalDateTime> cutoffCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(userRepository).deleteDeletedUsersBefore(cutoffCaptor.capture());
+
+        LocalDateTime cutoff = cutoffCaptor.getValue();
+        assertEquals(2, purged);
+        assertFalse(cutoff.isBefore(beforeCall.minusDays(User.ACCOUNT_RETENTION_DAYS)));
+        assertFalse(cutoff.isAfter(afterCall.minusDays(User.ACCOUNT_RETENTION_DAYS)));
     }
 
     @Test

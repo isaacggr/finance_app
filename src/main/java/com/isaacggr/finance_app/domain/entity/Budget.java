@@ -39,9 +39,6 @@ public class Budget {
     @Column(nullable = false)
     private int year;
 
-    @Column(nullable = false)
-    private boolean deleted = false;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -51,10 +48,9 @@ public class Budget {
     public Budget(User user, String category, BigDecimal amount, int month, int year) {
         this.user = user;
         this.category = Transaction.normalizeCategory(category);
-        this.amount = amount;
+        this.amount = Transaction.normalizeMonetaryAmount(amount);
         this.month = month;
         this.year = year;
-        this.deleted = false;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -73,11 +69,14 @@ public class Budget {
     }
 
     // Regras ricas de domínio
-    public void markAsDeleted() {
-        this.deleted = true;
+    public void updateAmount(BigDecimal newAmount) {
+        this.amount = Transaction.normalizeMonetaryAmount(newAmount);
     }
 
-    public void updateAmount(BigDecimal newAmount) {
-        this.amount = newAmount;
+    public void update(String category, BigDecimal amount, int month, int year) {
+        this.category = Transaction.normalizeCategory(category);
+        this.amount = Transaction.normalizeMonetaryAmount(amount);
+        this.month = month;
+        this.year = year;
     }
 }

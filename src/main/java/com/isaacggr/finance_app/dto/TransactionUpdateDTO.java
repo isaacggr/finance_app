@@ -2,7 +2,9 @@ package com.isaacggr.finance_app.dto;
 
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -13,10 +15,12 @@ import java.time.LocalDate;
 
 public record TransactionUpdateDTO(
 
-        @Schema(description = "Novo valor da transação", example = "150.00")
+        @Schema(description = "Novo valor monetário da transação (escala 2, RoundingMode.HALF_EVEN)", example = "150.00")
         @NotNull(message = "O valor da transação é obrigatório")
         @Positive(message = "O valor da transação deve ser positivo")
         @DecimalMin(value = "0.01", message = "O valor da transação deve ser de no mínimo 0.01")
+        @DecimalMax(value = "9999999999999.99", message = "O valor da transação deve ser no máximo 9999999999999.99")
+        @Digits(integer = 13, fraction = 2, message = "O valor da transação deve ter no máximo 13 dígitos inteiros e 2 casas decimais")
         BigDecimal amount,
 
         @Schema(description = "Novo tipo da transação (INCOME ou EXPENSE)", example = "EXPENSE")

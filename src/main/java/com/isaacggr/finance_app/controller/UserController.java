@@ -7,10 +7,12 @@ import com.isaacggr.finance_app.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/users")
@@ -30,7 +32,12 @@ public class UserController {
             @RequestBody @Valid UserCreateDTO dto
     ) {
         UserResponseDTO response = service.create(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentContextPath()
+                .path("/users/me")
+                .build()
+                .toUri();
+        return ResponseEntity.created(location).body(response);
     }
 
     // ✅ Obter perfil do usuário autenticado (Zero IDOR)
