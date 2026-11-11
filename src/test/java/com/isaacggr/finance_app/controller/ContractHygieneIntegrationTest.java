@@ -1,6 +1,8 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
+import com.isaacggr.finance_app.domain.entity.Goal;
+import com.isaacggr.finance_app.domain.entity.GoalContribution;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
@@ -20,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -329,6 +332,100 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("GET /goals/primary, POST /goals, PATCH /goals/{id}/primary, aportes e DELETE /goals/{id} devem respeitar contrato e fallback")
+    void goalsLifecycleAndPrimaryEndpoints_ContractWorks() throws Exception {
+        when(goalRepository.findByUserIdAndPrimaryTrue(userId)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/goals/primary")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNoContent());
+
+        UUID newGoalId = UUID.randomUUID();
+        UUID oldGoalId = UUID.randomUUID();
+        Goal olderGoal = new Goal(authenticatedUser, "Viagem Japão", null, new BigDecimal("10000.00"), null, true);
+        ReflectionTestUtils.setField(olderGoal, "id", oldGoalId);
+
+        when(goalRepository.findByUserIdAndPrimaryTrue(userId)).thenReturn(Optional.of(olderGoal));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> {
+            Goal g = inv.getArgument(0);
+            if (g.getId() == null) {
+                ReflectionTestUtils.setField(g, "id", newGoalId);
+            }
+            return g;
+        });
+        UUID initialContribId = UUID.randomUUID();
+        when(goalContributionRepository.save(any(GoalContribution.class))).thenAnswer(inv -> {
+            GoalContribution c = inv.getArgument(0);
+            if (c.getId() == null) {
+                ReflectionTestUtils.setField(c, "id", initialContribId);
+            }
+            return c;
+        });
+
+        mockMvc.perform(post("/goals")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Reserva de Emergência",
+                                  "targetAmount": 2000.00,
+                                  "initialAmount": 500.00,
+                                  "deadline": "2027-12-31"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(HttpHeaders.LOCATION, "http://localhost/goals/" + newGoalId))
+                .andExpect(jsonPath("$.primary").value(true))
+                .andExpect(jsonPath("$.currentAmount").value(500.0))
+                .andExpect(jsonPath("$.percentage").value(25.0))
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+
+        Goal newPrimary = new Goal(authenticatedUser, "Reserva de Emergência", null, new BigDecimal("2000.00"), LocalDate.of(2027, 12, 31), true);
+        ReflectionTestUtils.setField(newPrimary, "id", newGoalId);
+        newPrimary.applyContribution(new BigDecimal("500.00"));
+        olderGoal.unmarkAsPrimary();
+
+        when(goalRepository.findByUserIdAndPrimaryTrue(userId)).thenReturn(Optional.of(newPrimary));
+        mockMvc.perform(get("/goals/primary")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(newGoalId.toString()))
+                .andExpect(jsonPath("$.primary").value(true));
+
+        when(goalRepository.findByIdAndUserId(oldGoalId, userId)).thenReturn(Optional.of(olderGoal));
+        mockMvc.perform(patch("/goals/" + oldGoalId + "/primary")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(oldGoalId.toString()))
+                .andExpect(jsonPath("$.primary").value(true));
+
+        when(goalRepository.findByIdAndUserId(newGoalId, userId)).thenReturn(Optional.of(newPrimary));
+        mockMvc.perform(post("/goals/" + newGoalId + "/contributions")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 1500.00,
+                                  "note": "Bônus"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(HttpHeaders.LOCATION, "http://localhost/goals/" + newGoalId + "/contributions/" + initialContribId))
+                .andExpect(jsonPath("$.goal.currentAmount").value(2000.0))
+                .andExpect(jsonPath("$.goal.percentage").value(100.0))
+                .andExpect(jsonPath("$.goal.status").value("COMPLETED"));
+
+        when(goalRepository.findFirstByUserIdAndIdNotOrderByCreatedAtDesc(userId, oldGoalId))
+                .thenReturn(Optional.of(newPrimary));
+        mockMvc.perform(delete("/goals/" + oldGoalId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNoContent());
+
+        verify(goalRepository).delete(olderGoal);
+        assertTrue(newPrimary.isPrimary());
+    }
+
+    @Test
     @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable, expor PATCH /users/me e documentar respostas de erro")
     void openApiSpec_FlattensPageableAndDocumentsErrorsAndProfileEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
@@ -345,6 +442,10 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
                 .andExpect(jsonPath("$.paths['/users/me'].patch.responses['401']").exists())
                 .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/goals'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/goals/primary'].get.responses['204']").exists())
+                .andExpect(jsonPath("$.paths['/goals/{goalId}/primary'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/goals/{goalId}/contributions'].post.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='page')]").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='pageable')]").isEmpty());
     }
