@@ -4,98 +4,47 @@ import com.isaacggr.finance_app.domain.entity.Budget;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
-import com.isaacggr.finance_app.repository.BudgetRepository;
-import com.isaacggr.finance_app.repository.TransactionRepository;
-import com.isaacggr.finance_app.repository.UserRepository;
-import com.isaacggr.finance_app.repository.VerificationTokenRepository;
-import com.isaacggr.finance_app.service.TokenService;
+import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
-import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.orm.jpa.autoconfigure.HibernateJpaAutoConfiguration,org.springframework.boot.data.jpa.autoconfigure.JpaRepositoriesAutoConfiguration"
-})
-class ContractHygieneIntegrationTest {
+class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
 
-    @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
-    @Qualifier("springSecurityFilterChain")
-    private Filter springSecurityFilterChain;
-
-    @Autowired
-    private TokenService tokenService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @MockitoBean
-    private UserRepository userRepository;
-
-    @MockitoBean
-    private TransactionRepository transactionRepository;
-
-    @MockitoBean
-    private BudgetRepository budgetRepository;
-
-    @MockitoBean
-    private VerificationTokenRepository verificationTokenRepository;
-
-    @MockitoBean
-    private JavaMailSender mailSender;
-
-    private MockMvc mockMvc;
     private UUID userId;
     private User authenticatedUser;
     private String jwt;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(springSecurityFilterChain)
-                .build();
-
-        userId = UUID.randomUUID();
-        authenticatedUser = new User("Isaac", "isaac@example.com", passwordEncoder.encode("SenhaForte@123"));
-        authenticatedUser.verifyEmail();
-        ReflectionTestUtils.setField(authenticatedUser, "id", userId);
-
+        authenticatedUser = createVerifiedUser("Isaac", "isaac@example.com", "SenhaForte@123");
+        userId = authenticatedUser.getId();
         jwt = tokenService.generateToken(authenticatedUser);
         when(userRepository.findByIdAndDeletedFalse(userId)).thenReturn(Optional.of(authenticatedUser));
     }
@@ -315,11 +264,87 @@ class ContractHygieneIntegrationTest {
     }
 
     @Test
-    @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable (@ParameterObject) e expor PUT /budgets/{id}")
-    void openApiSpec_FlattensPageableAndExposesPutBudget() throws Exception {
+    @DisplayName("PATCH /users/me deve atualizar o nome do usuário autenticado sem envio de e-mail")
+    void patchUsersMe_UpdatesNameSuccessfully() throws Exception {
+        when(userRepository.findByIdAndDeletedFalse(userId)).thenReturn(Optional.of(authenticatedUser));
+        when(userRepository.save(authenticatedUser)).thenReturn(authenticatedUser);
+
+        mockMvc.perform(patch("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "  Isaac Editado  "
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Isaac Editado"))
+                .andExpect(jsonPath("$.email").value("isaac@example.com"));
+
+        mockMvc.perform(patch("/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "   "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.name").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH /users/me/password deve exigir senha atual e alterar sem código por e-mail")
+    void patchUsersMePassword_ValidatesCurrentPasswordAndChangesPassword() throws Exception {
+        when(userRepository.findByIdAndDeletedFalse(userId)).thenReturn(Optional.of(authenticatedUser));
+        when(userRepository.save(authenticatedUser)).thenReturn(authenticatedUser);
+
+        mockMvc.perform(patch("/users/me/password")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "SenhaErrada123!",
+                                  "newPassword": "NovaSenhaForte@456"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Senha atual incorreta"));
+
+        mockMvc.perform(patch("/users/me/password")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "SenhaForte@123",
+                                  "newPassword": "NovaSenhaForte@456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Senha alterada com sucesso."));
+
+        assertTrue(
+                passwordEncoder.matches("NovaSenhaForte@456", authenticatedUser.getPasswordHash())
+        );
+    }
+
+    @Test
+    @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable, expor PATCH /users/me e documentar respostas de erro")
+    void openApiSpec_FlattensPageableAndDocumentsErrorsAndProfileEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.paths['/budgets/{id}'].put").exists())
+                .andExpect(jsonPath("$.components.schemas.ErrorResponse").exists())
+                .andExpect(jsonPath("$.paths['/budgets/{id}'].put.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/budgets/{id}'].put.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/budgets/{id}'].put.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/budgets/{id}'].put.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/auth/login'].post.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/auth/login'].post.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/auth/login'].post.security").isEmpty())
+                .andExpect(jsonPath("$.paths['/users/me'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/users/me'].patch.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['401']").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='page')]").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='pageable')]").isEmpty());
     }

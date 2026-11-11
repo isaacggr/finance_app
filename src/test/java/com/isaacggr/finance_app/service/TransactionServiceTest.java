@@ -68,46 +68,29 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve criar transação com sucesso para usuário autenticado ativo e dados válidos")
-    void create_Success() {
-        when(transactionRepository.save(any(Transaction.class))).thenReturn(sampleTransaction);
-
-        Transaction created = transactionService.create(
-                sampleUser,
-                new BigDecimal("150.00"),
-                TransactionType.EXPENSE,
-                "ALIMENTACAO",
-                LocalDate.now(),
-                "Almoço de negócios"
-        );
-
-        assertNotNull(created);
-        assertEquals(new BigDecimal("150.00"), created.getAmount());
-        assertEquals(TransactionType.EXPENSE, created.getType());
-        assertEquals("ALIMENTACAO", created.getCategory());
-        verify(transactionRepository, times(1)).save(any(Transaction.class));
-    }
-
-    @Test
-    @DisplayName("Deve normalizar categoria em maiúsculas na criação")
-    void create_NormalizesCategory() {
+    @DisplayName("Deve criar transação com sucesso e normalizar categoria em maiúsculas")
+    void create_Success_NormalizesCategory() {
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Transaction created = transactionService.create(
                 sampleUser,
-                new BigDecimal("100.00"),
+                new BigDecimal("150.00"),
                 TransactionType.EXPENSE,
                 "  pets e veterinario  ",
                 LocalDate.now(),
                 "Vacina"
         );
 
+        assertNotNull(created);
+        assertEquals(new BigDecimal("150.00"), created.getAmount());
+        assertEquals(TransactionType.EXPENSE, created.getType());
         assertEquals("PETS E VETERINARIO", created.getCategory());
+        verify(transactionRepository, times(1)).save(any(Transaction.class));
     }
 
     @Test
-    @DisplayName("Deve lançar NotFoundException ao tentar criar transação quando usuário for nulo")
-    void create_ThrowsNotFoundException_WhenUserIsNull() {
+    @DisplayName("Deve lançar NotFoundException ao criar transação quando usuário for nulo ou inativo")
+    void create_ThrowsNotFoundException_WhenUserIsNullOrDeleted() {
         assertThrows(NotFoundException.class, () -> transactionService.create(
                 null,
                 new BigDecimal("100.00"),
@@ -116,13 +99,8 @@ class TransactionServiceTest {
                 LocalDate.now(),
                 "Depósito"
         ));
-    }
 
-    @Test
-    @DisplayName("Deve lançar NotFoundException ao tentar criar transação para usuário inativo")
-    void create_ThrowsNotFoundException_WhenUserIsDeleted() {
         sampleUser.markAsDeleted();
-
         assertThrows(NotFoundException.class, () -> transactionService.create(
                 sampleUser,
                 new BigDecimal("100.00"),
@@ -177,8 +155,8 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve listar transações do usuário de forma paginada com ordenação estável padrão")
-    void listByUser_Success() {
+    @DisplayName("Deve listar transações com e sem filtros usando ordenação estável padrão")
+    void listByUser_UsesDefaultStableSort_WithAndWithoutFilters() {
         Pageable pageable = PageRequest.of(0, 10);
         Pageable expectedPageable = PageRequest.of(
                 0,
@@ -188,25 +166,8 @@ class TransactionServiceTest {
         when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(expectedPageable)))
                 .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
 
-        Page<Transaction> result = transactionService.listByUser(userId, pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getTotalElements());
-    }
-
-    @Test
-    @DisplayName("Deve listar transações com filtros de período, categoria e tipo")
-    void listByUser_WithFilters_Success() {
-        Pageable pageable = PageRequest.of(0, 10);
-        Pageable expectedPageable = PageRequest.of(
-                0,
-                10,
-                Sort.by(Sort.Order.desc("date"), Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
-        );
-        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), eq(expectedPageable)))
-                .thenReturn(new PageImpl<>(List.of(sampleTransaction)));
-
-        Page<Transaction> result = transactionService.listByUser(
+        Page<Transaction> unfiltered = transactionService.listByUser(userId, pageable);
+        Page<Transaction> filtered = transactionService.listByUser(
                 userId,
                 LocalDate.now().minusDays(5),
                 LocalDate.now(),
@@ -215,8 +176,8 @@ class TransactionServiceTest {
                 pageable
         );
 
-        assertNotNull(result);
-        assertEquals(1, result.getTotalElements());
+        assertEquals(1, unfiltered.getTotalElements());
+        assertEquals(1, filtered.getTotalElements());
     }
 
     @Test
@@ -320,46 +281,19 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar ConflictException ao tentar atualizar transação com valor inválido")
-    void update_ThrowsConflict_WhenAmountIsZeroOrNegative() {
+    @DisplayName("Deve lançar ConflictException ao tentar atualizar transação com valor inválido ou sem data")
+    void update_ThrowsConflict_WhenAmountOrDateIsInvalid() {
         when(transactionRepository.findByIdAndUserId(transactionId, userId))
                 .thenReturn(Optional.of(sampleTransaction));
 
         assertThrows(ConflictException.class, () -> transactionService.update(
-                transactionId,
-                userId,
-                BigDecimal.ZERO,
-                TransactionType.EXPENSE,
-                "OUTROS",
-                LocalDate.now(),
-                "Atualização"
+                transactionId, userId, BigDecimal.ZERO, TransactionType.EXPENSE, "OUTROS", LocalDate.now(), "Atualização"
         ));
-
         assertThrows(ConflictException.class, () -> transactionService.update(
-                transactionId,
-                userId,
-                new BigDecimal("-10.00"),
-                TransactionType.EXPENSE,
-                "OUTROS",
-                LocalDate.now(),
-                "Atualização"
+                transactionId, userId, new BigDecimal("-10.00"), TransactionType.EXPENSE, "OUTROS", LocalDate.now(), "Atualização"
         ));
-    }
-
-    @Test
-    @DisplayName("Deve lançar ConflictException ao tentar atualizar transação sem data")
-    void update_ThrowsConflict_WhenDateIsNull() {
-        when(transactionRepository.findByIdAndUserId(transactionId, userId))
-                .thenReturn(Optional.of(sampleTransaction));
-
         assertThrows(ConflictException.class, () -> transactionService.update(
-                transactionId,
-                userId,
-                new BigDecimal("50.00"),
-                TransactionType.EXPENSE,
-                "OUTROS",
-                null,
-                "Atualização"
+                transactionId, userId, new BigDecimal("50.00"), TransactionType.EXPENSE, "OUTROS", null, "Atualização"
         ));
     }
 }

@@ -4,7 +4,10 @@ import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.domain.enums.TokenType;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
+import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
+import com.isaacggr.finance_app.dto.UserProfileUpdateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
+import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -74,25 +77,16 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar ConflictException quando o e-mail já estiver cadastrado e ativo")
-    void create_ThrowsConflictException_WhenEmailAlreadyExists() {
+    @DisplayName("Deve lançar ConflictException quando o e-mail já estiver cadastrado (conta ativa ou desativada)")
+    void create_ThrowsConflictException_WhenEmailAlreadyRegistered() {
         UserCreateDTO dto = new UserCreateDTO("Isaac Gregorio", "isaac@example.com", "password123");
-
         when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
 
         assertThrows(ConflictException.class, () -> userService.create(dto));
-        verify(userRepository, never()).save(any(User.class));
-    }
 
-    @Test
-    @DisplayName("Deve lançar ConflictException quando o e-mail pertencer a uma conta desativada")
-    void create_ThrowsConflictException_WhenEmailBelongsToDeletedUser() {
-        UserCreateDTO dto = new UserCreateDTO("Isaac Gregorio", "isaac@example.com", "password123");
         sampleUser.markAsDeleted();
-
-        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
-
         assertThrows(ConflictException.class, () -> userService.create(dto));
+
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -157,6 +151,75 @@ class UserServiceTest {
         when(userRepository.findById(id)).thenReturn(Optional.of(sampleUser));
 
         assertThrows(ConflictException.class, () -> userService.delete(id));
+    }
+
+    @Test
+    @DisplayName("Deve atualizar o nome do usuário ativo removendo espaços extras")
+    void updateProfile_Success() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(sampleUser));
+        when(userRepository.save(sampleUser)).thenReturn(sampleUser);
+
+        UserResponseDTO response = userService.updateProfile(id, new UserProfileUpdateDTO("  Isaac Atualizado  "));
+
+        assertEquals("Isaac Atualizado", response.name());
+        assertEquals("Isaac Atualizado", sampleUser.getName());
+        verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve lançar BusinessException ao atualizar nome com menos de 2 caracteres úteis")
+    void updateProfile_ThrowsBusinessException_WhenTrimmedNameTooShort() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(sampleUser));
+
+        assertThrows(BusinessException.class, () -> userService.updateProfile(id, new UserProfileUpdateDTO(" A ")));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve alterar senha quando a senha atual confere e a nova é diferente")
+    void changePassword_Success() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("SenhaAtual123", "encodedPassword123")).thenReturn(true);
+        when(passwordEncoder.matches("NovaSenha123", "encodedPassword123")).thenReturn(false);
+        when(passwordEncoder.encode("NovaSenha123")).thenReturn("encodedNovaSenha");
+
+        userService.changePassword(id, new UserPasswordUpdateDTO("SenhaAtual123", "NovaSenha123"));
+
+        assertEquals("encodedNovaSenha", sampleUser.getPasswordHash());
+        verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("Deve lançar BusinessException quando a senha atual estiver incorreta")
+    void changePassword_ThrowsBusinessException_WhenCurrentPasswordMismatch() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("SenhaErrada", "encodedPassword123")).thenReturn(false);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.changePassword(id, new UserPasswordUpdateDTO("SenhaErrada", "NovaSenha123"))
+        );
+        assertEquals("Senha atual incorreta", exception.getMessage());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve lançar BusinessException quando a nova senha for igual à senha atual")
+    void changePassword_ThrowsBusinessException_WhenNewPasswordEqualsCurrent() {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("SenhaAtual123", "encodedPassword123")).thenReturn(true);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userService.changePassword(id, new UserPasswordUpdateDTO("SenhaAtual123", "SenhaAtual123"))
+        );
+        assertEquals("A nova senha deve ser diferente da senha atual", exception.getMessage());
+        verify(userRepository, never()).save(any());
     }
 
     @Test

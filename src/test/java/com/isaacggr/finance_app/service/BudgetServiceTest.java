@@ -104,54 +104,37 @@ class BudgetServiceTest {
     }
 
     @Test
-    @DisplayName("Deve calcular progresso do orçamento dentro do limite com sucesso")
-    void getProgress_Success_WithinBudget() {
+    @DisplayName("Deve calcular progresso do orçamento dentro do limite, excedido e sem gastos")
+    void getProgress_CalculatesWithinExceededAndZeroSpentBudgets() {
+        assertBudgetProgress(List.of(new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("400.00"))),
+                "400.00", "400.00", "50.00", false);
+        assertBudgetProgress(List.of(new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("1000.00"))),
+                "1000.00", "-200.00", "125.00", true);
+        assertBudgetProgress(List.of(), "0.00", "800.00", "0.00", false);
+    }
+
+    private void assertBudgetProgress(
+            List<CategoryExpenseDTO> expenses,
+            String expectedSpent,
+            String expectedRemaining,
+            String expectedPercentage,
+            boolean expectedExceeded
+    ) {
         when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
                 .thenReturn(List.of(sampleBudget));
-
-        List<CategoryExpenseDTO> expenses = List.of(
-                new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("400.00"))
-        );
         when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(expenses);
 
         List<BudgetProgressDTO> progressList = budgetService.getProgress(userId, 11, 2026);
 
-        assertNotNull(progressList);
         assertEquals(1, progressList.size());
-
         BudgetProgressDTO progress = progressList.getFirst();
         assertEquals("ALIMENTACAO", progress.category());
         assertEquals(new BigDecimal("800.00"), progress.budgetAmount());
-        assertEquals(new BigDecimal("400.00"), progress.spentAmount());
-        assertEquals(new BigDecimal("400.00"), progress.remainingAmount());
-        assertEquals(new BigDecimal("50.00"), progress.percentageUsed());
-        assertFalse(progress.exceeded());
-    }
-
-    @Test
-    @DisplayName("Deve calcular progresso do orçamento quando estourar o limite")
-    void getProgress_Success_ExceededBudget() {
-        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
-                .thenReturn(List.of(sampleBudget));
-
-        List<CategoryExpenseDTO> expenses = List.of(
-                new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("1000.00"))
-        );
-        when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(expenses);
-
-        List<BudgetProgressDTO> progressList = budgetService.getProgress(userId, 11, 2026);
-
-        assertNotNull(progressList);
-        assertEquals(1, progressList.size());
-
-        BudgetProgressDTO progress = progressList.getFirst();
-        assertEquals(new BigDecimal("800.00"), progress.budgetAmount());
-        assertEquals(new BigDecimal("1000.00"), progress.spentAmount());
-        assertEquals(new BigDecimal("-200.00"), progress.remainingAmount());
-        assertEquals(new BigDecimal("125.00"), progress.percentageUsed());
-        assertTrue(progress.exceeded());
+        assertEquals(new BigDecimal(expectedSpent), progress.spentAmount());
+        assertEquals(new BigDecimal(expectedRemaining), progress.remainingAmount());
+        assertEquals(new BigDecimal(expectedPercentage), progress.percentageUsed());
+        assertEquals(expectedExceeded, progress.exceeded());
     }
 
     @Test
@@ -213,24 +196,6 @@ class BudgetServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> budgetService.update(budgetId, userId, dto));
-    }
-
-    @Test
-    @DisplayName("Deve incluir orçamentos com zero gasto no progresso com valores normalizados em escala 2")
-    void getProgress_IncludesZeroSpentBudgets() {
-        when(budgetRepository.findByUserIdAndMonthAndYear(userId, 11, 2026))
-                .thenReturn(List.of(sampleBudget));
-        when(transactionRepository.sumAmountByCategory(eq(userId), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of());
-
-        List<BudgetProgressDTO> progressList = budgetService.getProgress(userId, 11, 2026);
-
-        assertEquals(1, progressList.size());
-        BudgetProgressDTO progress = progressList.getFirst();
-        assertEquals(new BigDecimal("0.00"), progress.spentAmount());
-        assertEquals(new BigDecimal("800.00"), progress.remainingAmount());
-        assertEquals(new BigDecimal("0.00"), progress.percentageUsed());
-        assertFalse(progress.exceeded());
     }
 
     @Test

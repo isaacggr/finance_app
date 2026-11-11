@@ -5,9 +5,13 @@ import com.isaacggr.finance_app.dto.LoginRequestDTO;
 import com.isaacggr.finance_app.dto.LoginResponseDTO;
 import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
 import com.isaacggr.finance_app.dto.VerifyEmailRequestDTO;
+import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +35,11 @@ public class AuthController {
             summary = "Realizar login",
             description = "Autentica o usuário com e-mail e senha e retorna o token JWT. Se a conta tiver sido excluída há no máximo 30 dias, ela é reativada automaticamente no login."
     )
+    @ApiResponse(responseCode = "200", description = "Login realizado com sucesso")
+    @ApiResponse(responseCode = "401", description = "Credenciais inválidas ou conta expirada após 30 dias da exclusão",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "403", description = "E-mail pendente de confirmação antes do login",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO dto) {
         LoginResponseDTO response = authService.login(dto);
         return ResponseEntity.ok(response);

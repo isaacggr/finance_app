@@ -2,9 +2,15 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
+import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
+import com.isaacggr.finance_app.dto.UserProfileUpdateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
+import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
@@ -28,6 +35,9 @@ public class UserController {
     // ✅ Criar usuário (Rota pública de cadastro)
     @PostMapping
     @Operation(summary = "Cadastrar usuário", description = "Cria um novo usuário na aplicação com senha criptografada via BCrypt. Rota pública.")
+    @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso")
+    @ApiResponse(responseCode = "409", description = "E-mail já cadastrado ou em período de retenção de 30 dias",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<UserResponseDTO> create(
             @RequestBody @Valid UserCreateDTO dto
     ) {
@@ -43,15 +53,50 @@ public class UserController {
     // ✅ Obter perfil do usuário autenticado (Zero IDOR)
     @GetMapping("/me")
     @Operation(summary = "Obter perfil autenticado", description = "Retorna os dados cadastrais do próprio usuário autenticado. Essencial para o carregamento de sessão no front-end.")
+    @ApiResponse(responseCode = "200", description = "Perfil retornado com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<UserResponseDTO> getProfile(
             @AuthenticationPrincipal User user
     ) {
         return ResponseEntity.ok(service.findById(user.getId()));
     }
 
+    // ✅ Atualizar nome do perfil autenticado (Zero IDOR)
+    @PatchMapping("/me")
+    @Operation(summary = "Atualizar perfil autenticado", description = "Atualiza os dados editáveis do perfil (nome) do usuário autenticado sem necessidade de verificação por e-mail")
+    @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<UserResponseDTO> updateProfile(
+            @RequestBody @Valid UserProfileUpdateDTO dto,
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(service.updateProfile(user.getId(), dto));
+    }
+
+    // ✅ Alterar senha do usuário autenticado (exige senha atual, sem código por e-mail)
+    @PatchMapping("/me/password")
+    @Operation(summary = "Alterar senha do perfil autenticado", description = "Altera a senha da conta autenticada validando a senha atual via BCrypt, sem envio de código por e-mail")
+    @ApiResponse(responseCode = "200", description = "Senha alterada com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<Map<String, String>> changePassword(
+            @RequestBody @Valid UserPasswordUpdateDTO dto,
+            @AuthenticationPrincipal User user
+    ) {
+        service.changePassword(user.getId(), dto);
+        return ResponseEntity.ok(Map.of("message", "Senha alterada com sucesso."));
+    }
+
     // ✅ Excluir própria conta (Zero IDOR)
     @DeleteMapping("/me")
-    @Operation(summary = "Excluir própria conta", description = "Realiza a exclusão lógica (soft delete) da conta do próprio usuário autenticado")
+    @Operation(summary = "Excluir própria conta", description = "Realiza a exclusão lógica (soft delete) da conta do próprio usuário autenticado com período de retenção de 30 dias")
+    @ApiResponse(responseCode = "204", description = "Conta desativada com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "Usuário já se encontra desativado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal User user
     ) {

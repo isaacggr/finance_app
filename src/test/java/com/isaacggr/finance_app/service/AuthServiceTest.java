@@ -121,18 +121,21 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar UnauthorizedException quando o usuário não for encontrado")
-    void login_ThrowsUnauthorized_WhenUserNotFound() {
-        LoginRequestDTO dto = new LoginRequestDTO("notfound@example.com", "password");
+    @DisplayName("Deve lançar UnauthorizedException para usuário inexistente ou senha incorreta")
+    void login_ThrowsUnauthorized_WhenCredentialsInvalid() {
+        LoginRequestDTO unknownUser = new LoginRequestDTO("notfound@example.com", "password");
+        when(userRepository.findByEmail(unknownUser.email())).thenReturn(Optional.empty());
 
-        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.empty());
+        UnauthorizedException notFoundEx = assertThrows(UnauthorizedException.class, () -> authService.login(unknownUser));
+        assertEquals("Credenciais inválidas", notFoundEx.getMessage());
 
-        UnauthorizedException exception = assertThrows(
-                UnauthorizedException.class,
-                () -> authService.login(dto)
-        );
+        LoginRequestDTO wrongPass = new LoginRequestDTO("isaac@example.com", "wrongPassword");
+        when(userRepository.findByEmail(wrongPass.email())).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches(wrongPass.password(), sampleUser.getPasswordHash())).thenReturn(false);
 
-        assertEquals("Credenciais inválidas", exception.getMessage());
+        UnauthorizedException wrongPassEx = assertThrows(UnauthorizedException.class, () -> authService.login(wrongPass));
+        assertEquals("Credenciais inválidas", wrongPassEx.getMessage());
+
         verify(tokenService, never()).generateToken(any());
     }
 
@@ -157,61 +160,27 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar UnauthorizedException e não reativar conta excluída se a senha estiver incorreta")
-    void login_ThrowsUnauthorizedAndDoesNotReactivate_WhenDeletedUserPasswordWrong() {
-        LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "wrongPassword");
+    @DisplayName("Deve lançar UnauthorizedException e manter conta excluída quando senha falhar ou carência de 30 dias expirar")
+    void login_ThrowsUnauthorizedAndKeepsDeleted_WhenReactivationDisallowed() {
         sampleUser.markAsDeleted();
+        LoginRequestDTO wrongPassword = new LoginRequestDTO("isaac@example.com", "wrongPassword");
+        when(userRepository.findByEmail("isaac@example.com")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("wrongPassword", sampleUser.getPasswordHash())).thenReturn(false);
 
-        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
-        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(false);
-
-        UnauthorizedException exception = assertThrows(
-                UnauthorizedException.class,
-                () -> authService.login(dto)
-        );
-
-        assertEquals("Credenciais inválidas", exception.getMessage());
+        UnauthorizedException wrongEx = assertThrows(UnauthorizedException.class, () -> authService.login(wrongPassword));
+        assertEquals("Credenciais inválidas", wrongEx.getMessage());
         assertTrue(sampleUser.isDeleted());
         assertNotNull(sampleUser.getDeletedAt());
-        verify(userRepository, never()).save(any());
-        verify(tokenService, never()).generateToken(any());
-    }
 
-    @Test
-    @DisplayName("Deve lançar UnauthorizedException quando conta foi excluída há mais de 30 dias")
-    void login_ThrowsUnauthorized_WhenUserDeletedOver30DaysAgo() {
-        LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "plainPassword123");
-        sampleUser.markAsDeleted();
         ReflectionTestUtils.setField(sampleUser, "deletedAt", LocalDateTime.now().minusDays(31));
+        LoginRequestDTO expiredWindow = new LoginRequestDTO("isaac@example.com", "plainPassword123");
+        when(passwordEncoder.matches("plainPassword123", sampleUser.getPasswordHash())).thenReturn(true);
 
-        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
-        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(true);
-
-        UnauthorizedException exception = assertThrows(
-                UnauthorizedException.class,
-                () -> authService.login(dto)
-        );
-
-        assertEquals("Credenciais inválidas", exception.getMessage());
+        UnauthorizedException expiredEx = assertThrows(UnauthorizedException.class, () -> authService.login(expiredWindow));
+        assertEquals("Credenciais inválidas", expiredEx.getMessage());
         assertTrue(sampleUser.isDeleted());
+
         verify(userRepository, never()).save(any());
-        verify(tokenService, never()).generateToken(any());
-    }
-
-    @Test
-    @DisplayName("Deve lançar UnauthorizedException quando a senha estiver incorreta")
-    void login_ThrowsUnauthorized_WhenPasswordIsIncorrect() {
-        LoginRequestDTO dto = new LoginRequestDTO("isaac@example.com", "wrongPassword");
-
-        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(sampleUser));
-        when(passwordEncoder.matches(dto.password(), sampleUser.getPasswordHash())).thenReturn(false);
-
-        UnauthorizedException exception = assertThrows(
-                UnauthorizedException.class,
-                () -> authService.login(dto)
-        );
-
-        assertEquals("Credenciais inválidas", exception.getMessage());
         verify(tokenService, never()).generateToken(any());
     }
 

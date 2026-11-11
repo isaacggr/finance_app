@@ -14,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
+import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
+import com.isaacggr.finance_app.dto.UserProfileUpdateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
+import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -106,17 +109,49 @@ public class UserService {
     }
 
     // ======================
+    // UPDATE PROFILE (Sem reenvio de e-mail)
+    // ======================
+    public UserResponseDTO updateProfile(UUID id, UserProfileUpdateDTO dto) {
+        User user = findActiveUserById(id);
+
+        String normalizedName = dto.name().trim();
+        if (normalizedName.length() < 2 || normalizedName.length() > 50) {
+            throw new BusinessException("O nome deve ter entre 2 e 50 caracteres");
+        }
+
+        user.changeName(normalizedName);
+        return UserResponseDTO.fromEntity(userRepository.save(user));
+    }
+
+    // ======================
+    // CHANGE PASSWORD (Autenticado com senha atual, sem código por e-mail)
+    // ======================
+    public void changePassword(UUID id, UserPasswordUpdateDTO dto) {
+        User user = findActiveUserById(id);
+
+        if (!passwordEncoder.matches(dto.currentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("Senha atual incorreta");
+        }
+
+        if (passwordEncoder.matches(dto.newPassword(), user.getPasswordHash())) {
+            throw new BusinessException("A nova senha deve ser diferente da senha atual");
+        }
+
+        user.updatePassword(passwordEncoder.encode(dto.newPassword()));
+        userRepository.save(user);
+    }
+
+    // ======================
     // FIND BY ID
     // ======================
     @Transactional(readOnly = true)
     public UserResponseDTO findById(UUID id) {
+        return UserResponseDTO.fromEntity(findActiveUserById(id));
+    }
 
-        User user = userRepository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() ->
-                        new NotFoundException("Usuário não encontrado")
-                );
-
-        return UserResponseDTO.fromEntity(user);
+    private User findActiveUserById(UUID id) {
+        return userRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new NotFoundException("Usuário não encontrado"));
     }
 
     // ======================

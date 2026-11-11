@@ -1,34 +1,23 @@
 package com.isaacggr.finance_app.config;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.repository.BudgetRepository;
-import com.isaacggr.finance_app.repository.TransactionRepository;
-import com.isaacggr.finance_app.repository.UserRepository;
-import com.isaacggr.finance_app.repository.VerificationTokenRepository;
-import com.isaacggr.finance_app.service.TokenService;
-import jakarta.servlet.Filter;
-import org.junit.jupiter.api.BeforeEach;
+import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,52 +25,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.orm.jpa.autoconfigure.HibernateJpaAutoConfiguration,org.springframework.boot.data.jpa.autoconfigure.JpaRepositoriesAutoConfiguration"
-})
-class SecurityConfigTest {
-
-    @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
-    @Qualifier("springSecurityFilterChain")
-    private Filter springSecurityFilterChain;
-
-    @Autowired
-    private TokenService tokenService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @MockitoBean
-    private UserRepository userRepository;
-
-    @MockitoBean
-    private TransactionRepository transactionRepository;
-
-    @MockitoBean
-    private BudgetRepository budgetRepository;
-
-    @MockitoBean
-    private VerificationTokenRepository verificationTokenRepository;
-
-    @MockitoBean
-    private JavaMailSender mailSender;
-
-    private MockMvc mockMvc;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(springSecurityFilterChain)
-                .build();
-    }
+class SecurityConfigTest extends AbstractWebIntegrationTest {
 
     @Test
-    @DisplayName("Deve retornar 401 Unauthorized com WWW-Authenticate Bearer quando token estiver ausente")
-    void shouldReturn401WithBearerHeader_WhenTokenMissing() throws Exception {
-        mockMvc.perform(get("/transactions"))
+    @DisplayName("Deve retornar 401 Unauthorized com WWW-Authenticate Bearer quando token estiver ausente ou inválido")
+    void shouldReturn401WithBearerHeader_WhenTokenMissingOrInvalid() throws Exception {
+        assertUnauthorizedBearer(null);
+        assertUnauthorizedBearer("Bearer token.invalido.aqui");
+    }
+
+    private void assertUnauthorizedBearer(String authorizationHeader) throws Exception {
+        var request = get("/transactions");
+        if (authorizationHeader != null) {
+            request.header(HttpHeaders.AUTHORIZATION, authorizationHeader);
+        }
+
+        mockMvc.perform(request)
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -91,27 +50,13 @@ class SecurityConfigTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 401 Unauthorized quando token JWT for inválido ou expirado")
-    void shouldReturn401_WhenTokenInvalid() throws Exception {
-        mockMvc.perform(get("/transactions")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer token.invalido.aqui"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
-                .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
     @DisplayName("Deve permitir acesso (200 OK) com token JWT válido de usuário ativo e verificado")
     @SuppressWarnings("unchecked")
     void shouldAllowAccess_WhenTokenValid() throws Exception {
-        UUID userId = UUID.randomUUID();
-        User user = new User("Isaac", "isaac@example.com", passwordEncoder.encode("Senha123!"));
-        user.verifyEmail();
-        ReflectionTestUtils.setField(user, "id", userId);
-
+        User user = createVerifiedUser("Isaac", "isaac@example.com", "Senha123!");
         String jwt = tokenService.generateToken(user);
 
-        when(userRepository.findByIdAndDeletedFalse(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndDeletedFalse(user.getId())).thenReturn(Optional.of(user));
         when(transactionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
@@ -164,11 +109,23 @@ class SecurityConfigTest {
                 "http://localhost:5174/, https://finangame.vercel.app///"
         );
         var corsConfig = configWithTrailingSlashes.corsConfigurationSource()
-                .getCorsConfiguration(new org.springframework.mock.web.MockHttpServletRequest("GET", "/auth/login"));
-        org.junit.jupiter.api.Assertions.assertNotNull(corsConfig);
-        org.junit.jupiter.api.Assertions.assertEquals(
-                java.util.List.of("http://localhost:5174", "https://finangame.vercel.app"),
+                .getCorsConfiguration(new MockHttpServletRequest("GET", "/auth/login"));
+        assertNotNull(corsConfig);
+        assertEquals(
+                List.of("http://localhost:5174", "https://finangame.vercel.app"),
                 corsConfig.getAllowedOriginPatterns()
         );
+    }
+
+    @Test
+    @DisplayName("Deve expor /actuator/health publicamente e manter demais endpoints do actuator protegidos")
+    void shouldExposeOnlyHealthEndpointPublicly() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
+        mockMvc.perform(get("/actuator/env"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
     }
 }

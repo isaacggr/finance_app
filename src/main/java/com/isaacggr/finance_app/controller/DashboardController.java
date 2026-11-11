@@ -2,9 +2,13 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
+import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +32,9 @@ public class DashboardController {
 
     @GetMapping("/summary")
     @Operation(summary = "Obter resumo financeiro", description = "Retorna métricas consolidadas (total de receitas, despesas, saldo e detalhamento por categoria) para um intervalo de datas ou mês corrente")
+    @ApiResponse(responseCode = "200", description = "Resumo financeiro retornado com sucesso")
+    @ApiResponse(responseCode = "409", description = "Intervalo de datas inválido (startDate posterior a endDate)",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<DashboardSummaryDTO> getSummary(
             @RequestParam(required = false) @Parameter(description = "Data inicial do período (AAAA-MM-DD)", example = "2026-11-01") LocalDate startDate,
             @RequestParam(required = false) @Parameter(description = "Data final do período (AAAA-MM-DD)", example = "2026-11-30") LocalDate endDate,

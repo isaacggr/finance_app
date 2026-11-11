@@ -1,10 +1,14 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.BillAlertService;
 import com.isaacggr.finance_app.service.MonthlyReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,6 +37,9 @@ public class ReportController {
             summary = "Enviar relatório mensal por e-mail",
             description = "Consolida receitas, despesas, saldo e maiores gastos do mês selecionado (padrão: mês anterior) e despacha por e-mail para o usuário autenticado"
     )
+    @ApiResponse(responseCode = "200", description = "Relatório mensal enviado com sucesso")
+    @ApiResponse(responseCode = "409", description = "Conflito ao calcular o período do relatório",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<Map<String, String>> sendMonthlyReport(
             @RequestParam(required = false) @Parameter(description = "Mês de referência (1 a 12). Opcional, assume o mês anterior se omitido.", example = "10") Integer month,
             @RequestParam(required = false) @Parameter(description = "Ano de referência (ex: 2026). Opcional, assume o ano atual se omitido.", example = "2026") Integer year,
