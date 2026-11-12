@@ -56,7 +56,7 @@ public class ReportController {
     @PostMapping("/bill-alerts/send-me")
     @Operation(
             summary = "Enviar alerta de contas a vencer por e-mail",
-            description = "Verifica despesas agendadas para vencer nos próximos dias (padrão: 3 dias) e envia um alerta preventivo por e-mail para o usuário autenticado"
+            description = "Verifica contas a pagar em aberto (vencidas ou a vencer nos próximos dias, padrão 3 dias) e envia um alerta preventivo por e-mail para o usuário autenticado"
     )
     public ResponseEntity<Map<String, String>> sendBillAlerts(
             @RequestParam(required = false, defaultValue = "3") @Parameter(description = "Janela de dias à frente para verificação (1 a 30)", example = "3") Integer days,
@@ -65,8 +65,8 @@ public class ReportController {
         int count = billAlertService.sendAlertsForUser(user, days);
 
         String message = (count > 0)
-                ? "Alerta enviado com sucesso com " + count + " conta(s) a vencer nos próximos " + days + " dias."
-                : "Você não possui despesas a vencer nos próximos " + days + " dias.";
+                ? "Alerta enviado com sucesso com " + count + " conta(s) em aberto até os próximos " + days + " dias."
+                : "Você não possui contas em aberto vencendo nos próximos " + days + " dias.";
 
         return ResponseEntity.ok(Map.of("message", message, "billsFound", String.valueOf(count)));
     }

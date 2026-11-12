@@ -1,6 +1,7 @@
 package com.isaacggr.finance_app.support;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.GoalContributionRepository;
 import com.isaacggr.finance_app.repository.GoalRepository;
@@ -59,6 +60,9 @@ public abstract class AbstractWebIntegrationTest {
 
     @MockitoBean
     protected GoalContributionRepository goalContributionRepository;
+
+    @MockitoBean
+    protected BillRepository billRepository;
 
     @MockitoBean
     protected VerificationTokenRepository verificationTokenRepository;

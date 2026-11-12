@@ -1,14 +1,16 @@
 package com.isaacggr.finance_app.service;
 
-import com.isaacggr.finance_app.domain.entity.Transaction;
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.repository.TransactionRepository;
+import com.isaacggr.finance_app.domain.enums.BillRecurrence;
+import com.isaacggr.finance_app.domain.enums.BillStatus;
+import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,12 +18,16 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -32,7 +38,7 @@ class BillAlertServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private TransactionRepository transactionRepository;
+    private BillRepository billRepository;
 
     @Mock
     private EmailService emailService;
@@ -42,10 +48,13 @@ class BillAlertServiceTest {
 
     private User user1;
     private User user2;
-    private Transaction bill1;
+    private Bill bill1;
+    private LocalDate today;
 
     @BeforeEach
     void setUp() {
+        today = LocalDate.now(BillAlertService.DEFAULT_ZONE);
+
         user1 = new User("Isaac Gregorio", "isaac@example.com", "hash1");
         ReflectionTestUtils.setField(user1, "id", UUID.randomUUID());
         user1.verifyEmail();
@@ -54,28 +63,42 @@ class BillAlertServiceTest {
         ReflectionTestUtils.setField(user2, "id", UUID.randomUUID());
         user2.verifyEmail();
 
-        bill1 = new Transaction(
+        bill1 = new Bill(
                 user1,
+                "Internet Fibra",
+                "Fatura mensal",
+                "moradia",
                 new BigDecimal("120.00"),
-                TransactionType.EXPENSE,
-                "OUTROS",
-                LocalDate.now().plusDays(2),
-                "Internet Fibra"
+                today.plusDays(3),
+                BillRecurrence.MONTHLY
         );
     }
 
     @Test
-    @DisplayName("Deve processar alertas diários e enviar e-mails apenas para usuários com contas a vencer")
-    void processDailyBillAlerts_Success() {
+    @DisplayName("Deve alertar no CRON apenas contas pendentes que vencem hoje ou em exatamente 3 dias")
+    @SuppressWarnings("unchecked")
+    void processDailyBillAlerts_Success_NotifiesOnlyDueTodayOrThreeDaysAhead() {
         when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1, user2));
-        when(transactionRepository.findUpcomingTransactions(eq(user1.getId()), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
+        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user1.getId()), eq(BillStatus.PENDING), anyCollection()))
                 .thenReturn(List.of(bill1));
-        when(transactionRepository.findUpcomingTransactions(eq(user2.getId()), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
+        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user2.getId()), eq(BillStatus.PENDING), anyCollection()))
                 .thenReturn(Collections.emptyList());
 
         billAlertService.processDailyBillAlerts();
 
-        verify(emailService, times(1)).sendBillAlertEmail(eq(user1.getEmail()), eq(user1.getName()), eq(List.of(bill1)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
+        ArgumentCaptor<Collection<LocalDate>> datesCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(billRepository).findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user1.getId()), eq(BillStatus.PENDING), datesCaptor.capture());
+
+        Collection<LocalDate> capturedDates = datesCaptor.getValue();
+        assertEquals(2, capturedDates.size());
+        assertTrue(capturedDates.contains(today));
+        assertTrue(capturedDates.contains(today.plusDays(3)));
+
+        verify(emailService, times(1)).sendBillAlertEmail(
+                eq(user1.getEmail()), eq(user1.getName()), eq(List.of(bill1)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
         verify(emailService, never()).sendBillAlertEmail(eq(user2.getEmail()), any(), any(), anyInt());
     }
 
@@ -83,42 +106,47 @@ class BillAlertServiceTest {
     @DisplayName("Deve continuar o processamento caso um usuário lance exceção no envio de alerta")
     void processDailyBillAlerts_ContinuesProcessing_WhenOneUserFails() {
         when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1, user2));
-        when(transactionRepository.findUpcomingTransactions(eq(user1.getId()), any(), any(), any()))
+        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user1.getId()), eq(BillStatus.PENDING), anyCollection()))
                 .thenThrow(new RuntimeException("Falha na consulta"));
 
-        Transaction bill2 = new Transaction(
+        Bill bill2 = new Bill(
                 user2,
+                "Energia",
+                null,
+                "MORADIA",
                 new BigDecimal("250.00"),
-                TransactionType.EXPENSE,
-                "ALUGUEL",
-                LocalDate.now().plusDays(1),
-                "Energia"
+                today,
+                BillRecurrence.ONCE
         );
-        when(transactionRepository.findUpcomingTransactions(eq(user2.getId()), any(), any(), any()))
+        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user2.getId()), eq(BillStatus.PENDING), anyCollection()))
                 .thenReturn(List.of(bill2));
 
         billAlertService.processDailyBillAlerts();
 
         verify(emailService, never()).sendBillAlertEmail(eq(user1.getEmail()), any(), any(), anyInt());
-        verify(emailService, times(1)).sendBillAlertEmail(eq(user2.getEmail()), eq(user2.getName()), eq(List.of(bill2)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
+        verify(emailService, times(1)).sendBillAlertEmail(
+                eq(user2.getEmail()), eq(user2.getName()), eq(List.of(bill2)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
     }
 
     @Test
     @DisplayName("Deve enviar alerta sob demanda com janela de dias personalizada")
     void sendAlertsForUser_Success_WithCustomDays() {
-        when(transactionRepository.findUpcomingTransactions(eq(user1.getId()), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
+        when(billRepository.findOpenBillsUpTo(user1.getId(), today.plusDays(7)))
                 .thenReturn(List.of(bill1));
 
         int count = billAlertService.sendAlertsForUser(user1, 7);
 
         assertEquals(1, count);
-        verify(emailService, times(1)).sendBillAlertEmail(eq(user1.getEmail()), eq(user1.getName()), eq(List.of(bill1)), eq(7));
+        verify(emailService, times(1)).sendBillAlertEmail(
+                eq(user1.getEmail()), eq(user1.getName()), eq(List.of(bill1)), eq(7));
     }
 
     @Test
     @DisplayName("Deve aplicar janela padrão quando daysAhead for nulo ou inválido")
     void sendAlertsForUser_DefaultDays_WhenNullOrInvalid() {
-        when(transactionRepository.findUpcomingTransactions(eq(user1.getId()), eq(TransactionType.EXPENSE), any(LocalDate.class), any(LocalDate.class)))
+        when(billRepository.findOpenBillsUpTo(user1.getId(), today.plusDays(BillAlertService.DEFAULT_DAYS_AHEAD)))
                 .thenReturn(Collections.emptyList());
 
         int countNull = billAlertService.sendAlertsForUser(user1, null);
@@ -128,6 +156,8 @@ class BillAlertServiceTest {
         assertEquals(0, countNull);
         assertEquals(0, countNegative);
         assertEquals(0, countExceeded);
+        verify(billRepository, times(3))
+                .findOpenBillsUpTo(user1.getId(), today.plusDays(BillAlertService.DEFAULT_DAYS_AHEAD));
         verify(emailService, never()).sendBillAlertEmail(any(), any(), any(), anyInt());
     }
 }

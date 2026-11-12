@@ -1,9 +1,9 @@
 package com.isaacggr.finance_app.service;
 
-import com.isaacggr.finance_app.domain.entity.Transaction;
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.repository.TransactionRepository;
+import com.isaacggr.finance_app.domain.enums.BillStatus;
+import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -19,46 +20,48 @@ public class BillAlertService {
 
     private static final Logger log = LoggerFactory.getLogger(BillAlertService.class);
     public static final int DEFAULT_DAYS_AHEAD = 3;
+    public static final ZoneId DEFAULT_ZONE = Bill.DEFAULT_ZONE;
 
     private final UserRepository userRepository;
-    private final TransactionRepository transactionRepository;
+    private final BillRepository billRepository;
     private final EmailService emailService;
 
     public BillAlertService(
             UserRepository userRepository,
-            TransactionRepository transactionRepository,
+            BillRepository billRepository,
             EmailService emailService
     ) {
         this.userRepository = userRepository;
-        this.transactionRepository = transactionRepository;
+        this.billRepository = billRepository;
         this.emailService = emailService;
     }
 
     // ==========================================
-    // DISPARO AGENDADO DIÁRIO (09:00 AM)
+    // DISPARO AGENDADO DIÁRIO (09:00 America/Sao_Paulo)
+    // Notifica apenas contas pendentes que vencem em exatos 3 dias ou hoje (sem spam diário)
     // ==========================================
-    @Scheduled(cron = "${app.reports.bill-alerts.cron:0 0 9 * * ?}")
+    @Scheduled(cron = "${app.reports.bill-alerts.cron:0 0 9 * * ?}", zone = "America/Sao_Paulo")
     @Transactional(readOnly = true)
     public void processDailyBillAlerts() {
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(DEFAULT_DAYS_AHEAD);
+        LocalDate today = LocalDate.now(DEFAULT_ZONE);
+        LocalDate threeDaysAhead = today.plusDays(DEFAULT_DAYS_AHEAD);
+        List<LocalDate> targetDueDates = List.of(today, threeDaysAhead);
 
-        log.info("⏰ [CRON] Iniciando rotina diária de alertas de contas a vencer ({} a {})", startDate, endDate);
+        log.info("⏰ [CRON] Iniciando rotina de alertas de contas para {} e {} (America/Sao_Paulo)", today, threeDaysAhead);
 
         List<User> eligibleUsers = userRepository.findByEmailVerifiedTrueAndDeletedFalse();
         int totalAlertsSent = 0;
 
         for (User user : eligibleUsers) {
             try {
-                List<Transaction> upcomingBills = transactionRepository.findUpcomingTransactions(
+                List<Bill> billsToAlert = billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
                         user.getId(),
-                        TransactionType.EXPENSE,
-                        startDate,
-                        endDate
+                        BillStatus.PENDING,
+                        targetDueDates
                 );
 
-                if (!upcomingBills.isEmpty()) {
-                    emailService.sendBillAlertEmail(user.getEmail(), user.getName(), upcomingBills, DEFAULT_DAYS_AHEAD);
+                if (!billsToAlert.isEmpty()) {
+                    emailService.sendBillAlertEmail(user.getEmail(), user.getName(), billsToAlert, DEFAULT_DAYS_AHEAD);
                     totalAlertsSent++;
                 }
             } catch (Exception ex) {
@@ -76,21 +79,15 @@ public class BillAlertService {
     public int sendAlertsForUser(User user, Integer daysAhead) {
         int effectiveDays = (daysAhead != null && daysAhead > 0 && daysAhead <= 30) ? daysAhead : DEFAULT_DAYS_AHEAD;
 
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(effectiveDays);
+        LocalDate today = LocalDate.now(DEFAULT_ZONE);
+        LocalDate endDate = today.plusDays(effectiveDays);
 
-        List<Transaction> upcomingBills = transactionRepository.findUpcomingTransactions(
-                user.getId(),
-                TransactionType.EXPENSE,
-                startDate,
-                endDate
-        );
+        List<Bill> openBills = billRepository.findOpenBillsUpTo(user.getId(), endDate);
 
-        if (!upcomingBills.isEmpty()) {
-            emailService.sendBillAlertEmail(user.getEmail(), user.getName(), upcomingBills, effectiveDays);
+        if (!openBills.isEmpty()) {
+            emailService.sendBillAlertEmail(user.getEmail(), user.getName(), openBills, effectiveDays);
         }
 
-        return upcomingBills.size();
+        return openBills.size();
     }
 }
-

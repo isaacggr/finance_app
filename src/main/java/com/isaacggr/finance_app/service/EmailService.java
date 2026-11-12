@@ -1,6 +1,6 @@
 package com.isaacggr.finance_app.service;
 
-import com.isaacggr.finance_app.domain.entity.Transaction;
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
 import jakarta.mail.MessagingException;
@@ -12,6 +12,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -179,58 +180,60 @@ public class EmailService {
     }
 
     @Async
-    public void sendBillAlertEmail(String toEmail, String name, List<Transaction> upcomingBills, int daysAhead) {
-        log.info("🔔 [ALERTA CONTAS] Enviando alerta de {} contas a vencer para {}", upcomingBills.size(), toEmail);
+    public void sendBillAlertEmail(String toEmail, String name, List<Bill> upcomingBills, int daysAhead) {
+        log.info("🔔 [ALERTA CONTAS] Enviando alerta de {} conta(s) para {}", upcomingBills.size(), toEmail);
 
         BigDecimal totalUpcoming = upcomingBills.stream()
-                .map(Transaction::getAmount)
+                .map(Bill::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
         StringBuilder billRows = new StringBuilder();
-        for (Transaction bill : upcomingBills) {
-            String desc = (bill.getDescription() != null && !bill.getDescription().isBlank())
-                    ? bill.getDescription()
-                    : bill.getCategory();
+        for (Bill bill : upcomingBills) {
+            String safeTitle = HtmlUtils.htmlEscape(bill.getTitle());
+            String safeCategory = HtmlUtils.htmlEscape(bill.getCategory());
+            String statusLabel = HtmlUtils.htmlEscape(formatDueStatus(bill.getDueInDays()));
 
             billRows.append("""
                     <tr style="border-bottom: 1px solid #f0f0f0;">
                         <td style="padding: 10px 14px; color: #333333; font-weight: 500;">%s</td>
                         <td style="padding: 10px 14px; color: #616161;">%s</td>
-                        <td style="padding: 10px 14px; text-align: center; color: #e65100; font-weight: 500;">%s</td>
+                        <td style="padding: 10px 14px; text-align: center; color: #e65100; font-weight: 500;">%s (%s)</td>
                         <td style="padding: 10px 14px; text-align: right; font-weight: bold; color: #c62828;">%s</td>
                     </tr>
                     """.formatted(
-                    desc,
-                    bill.getCategory(),
-                    bill.getDate().format(dateFormatter),
+                    safeTitle,
+                    safeCategory,
+                    bill.getDueDate().format(dateFormatter),
+                    statusLabel,
                     formatCurrency(bill.getAmount())
             ));
         }
 
+        String safeName = HtmlUtils.htmlEscape(name);
         String htmlContent = """
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #ffe082; border-radius: 12px; background-color: #ffffff;">
                     <div style="text-align: center; border-bottom: 2px solid #fff8e1; padding-bottom: 16px; margin-bottom: 20px;">
-                        <h1 style="color: #e65100; margin: 0; font-size: 24px;">⏰ Alerta de Contas a Vencer</h1>
-                        <p style="color: #616161; margin: 6px 0 0; font-size: 15px;">Aviso preventivo para os próximos <strong>%d dias</strong></p>
+                        <h1 style="color: #e65100; margin: 0; font-size: 24px;">⏰ Alerta de Contas a Pagar</h1>
+                        <p style="color: #616161; margin: 6px 0 0; font-size: 15px;">Lembrete preventivo (janela de <strong>%d dias</strong>)</p>
                     </div>
 
-                    <p style="font-size: 15px; color: #333333;">Olá, <strong>%s</strong>! Identificamos que você possui despesas agendadas para vencer nos próximos dias:</p>
+                    <p style="font-size: 15px; color: #333333;">Olá, <strong>%s</strong>! Você possui conta(s) em aberto que merecem atenção:</p>
 
-                    <!-- CARD DE TOTAL A VENCER -->
+                    <!-- CARD DE TOTAL -->
                     <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; padding: 16px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                        <div style="font-size: 12px; color: #e65100; font-weight: bold; text-transform: uppercase;">Total Previsto para Vencer</div>
+                        <div style="font-size: 12px; color: #e65100; font-weight: bold; text-transform: uppercase;">Total das Contas Alertadas</div>
                         <div style="font-size: 24px; color: #bf360c; font-weight: bold; margin-top: 4px;">%s</div>
                     </div>
 
                     <!-- TABELA DE CONTAS -->
                     <div style="margin-top: 25px;">
-                        <h3 style="color: #37474f; font-size: 16px; margin-bottom: 12px;">📋 Detalhamento das Despesas</h3>
+                        <h3 style="color: #37474f; font-size: 16px; margin-bottom: 12px;">📋 Detalhamento das Contas</h3>
                         <table style="width: 100%%; border-collapse: collapse; border: 1px solid #eeeeee; border-radius: 8px; overflow: hidden;">
                             <thead>
                                 <tr style="background-color: #fafafa; border-bottom: 2px solid #eeeeee; text-align: left;">
-                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161;">Descrição</th>
+                                    <th style="padding: 10px 14px; font-size: 13px; color: #616161;">Conta</th>
                                     <th style="padding: 10px 14px; font-size: 13px; color: #616161;">Categoria</th>
                                     <th style="padding: 10px 14px; font-size: 13px; color: #616161; text-align: center;">Vencimento</th>
                                     <th style="padding: 10px 14px; font-size: 13px; color: #616161; text-align: right;">Valor</th>
@@ -250,12 +253,23 @@ public class EmailService {
                 </div>
                 """.formatted(
                 daysAhead,
-                name,
+                safeName,
                 formatCurrency(totalUpcoming),
                 billRows.toString()
         );
 
-        sendHtmlEmail(toEmail, "Alerta de Contas a Vencer nos próximos " + daysAhead + " dias - Finance App", htmlContent);
+        sendHtmlEmail(toEmail, "Alerta de Contas a Vencer - Finance App", htmlContent);
+    }
+
+    private String formatDueStatus(long dueInDays) {
+        if (dueInDays == 0) {
+            return "Vence hoje";
+        }
+        if (dueInDays < 0) {
+            long overdueDays = Math.abs(dueInDays);
+            return "Atrasada há " + overdueDays + (overdueDays == 1 ? " dia" : " dias");
+        }
+        return "Em " + dueInDays + (dueInDays == 1 ? " dia" : " dias");
     }
 
     private String formatCurrency(BigDecimal amount) {

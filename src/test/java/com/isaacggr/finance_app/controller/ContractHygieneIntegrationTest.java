@@ -1,11 +1,13 @@
 package com.isaacggr.finance_app.controller;
 
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.Budget;
 import com.isaacggr.finance_app.domain.entity.Goal;
 import com.isaacggr.finance_app.domain.entity.GoalContribution;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
+import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -23,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -426,6 +429,118 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("Endpoints de /bills devem criar, listar próximos vencimentos, pagar gerando despesa/recorrência e excluir")
+    void billsLifecycleUpcomingAndPayEndpoints_ContractWorks() throws Exception {
+        UUID billId = UUID.randomUUID();
+        UUID nextBillId = UUID.randomUUID();
+        UUID generatedTxId = UUID.randomUUID();
+        LocalDate today = LocalDate.now(Bill.DEFAULT_ZONE);
+
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> {
+            Bill saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                ReflectionTestUtils.setField(saved, "id", billId);
+            }
+            return saved;
+        });
+
+        mockMvc.perform(post("/bills")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Internet Fibra",
+                                  "category": "moradia",
+                                  "amount": 129.90,
+                                  "dueDate": "%s",
+                                  "recurrence": "MONTHLY"
+                                }
+                                """.formatted(today.plusDays(3))))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(HttpHeaders.LOCATION, "http://localhost/bills/" + billId))
+                .andExpect(jsonPath("$.title").value("Internet Fibra"))
+                .andExpect(jsonPath("$.category").value("MORADIA"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.dueInDays").value(3))
+                .andExpect(jsonPath("$.recurrence").value("MONTHLY"));
+
+        Bill overdueBill = new Bill(
+                authenticatedUser,
+                "Energia",
+                null,
+                "MORADIA",
+                new BigDecimal("210.00"),
+                today.minusDays(2),
+                BillRecurrence.ONCE
+        );
+        ReflectionTestUtils.setField(overdueBill, "id", UUID.randomUUID());
+
+        when(billRepository.findOpenBillsUpTo(userId, today.plusDays(7))).thenReturn(List.of(overdueBill));
+
+        mockMvc.perform(get("/bills/upcoming")
+                        .param("days", "7")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("OVERDUE"))
+                .andExpect(jsonPath("$[0].dueInDays").value(-2));
+
+        Bill monthlyBill = new Bill(
+                authenticatedUser,
+                "Internet Fibra",
+                null,
+                "MORADIA",
+                new BigDecimal("129.90"),
+                today.plusDays(3),
+                BillRecurrence.MONTHLY
+        );
+        ReflectionTestUtils.setField(monthlyBill, "id", billId);
+
+        when(billRepository.findByIdAndUserId(billId, userId)).thenReturn(Optional.of(monthlyBill));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction tx = invocation.getArgument(0);
+            ReflectionTestUtils.setField(tx, "id", generatedTxId);
+            return tx;
+        });
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> {
+            Bill saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                ReflectionTestUtils.setField(saved, "id", nextBillId);
+            }
+            return saved;
+        });
+
+        mockMvc.perform(patch("/bills/" + billId + "/pay")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bill.status").value("PAID"))
+                .andExpect(jsonPath("$.bill.paidTransactionId").value(generatedTxId.toString()))
+                .andExpect(jsonPath("$.generatedTransactionId").value(generatedTxId.toString()))
+                .andExpect(jsonPath("$.nextBill.id").value(nextBillId.toString()))
+                .andExpect(jsonPath("$.nextBill.dueDate").value(today.plusDays(3).plusMonths(1).toString()))
+                .andExpect(jsonPath("$.nextBill.status").value("PENDING"));
+
+        mockMvc.perform(put("/bills/" + billId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Internet Fibra",
+                                  "category": "MORADIA",
+                                  "amount": 139.90,
+                                  "dueDate": "%s",
+                                  "recurrence": "MONTHLY"
+                                }
+                                """.formatted(today.plusDays(5))))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(delete("/bills/" + billId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNoContent());
+
+        verify(billRepository).delete(monthlyBill);
+    }
+
+    @Test
     @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable, expor PATCH /users/me e documentar respostas de erro")
     void openApiSpec_FlattensPageableAndDocumentsErrorsAndProfileEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
@@ -446,6 +561,11 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
                 .andExpect(jsonPath("$.paths['/goals/primary'].get.responses['204']").exists())
                 .andExpect(jsonPath("$.paths['/goals/{goalId}/primary'].patch.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/goals/{goalId}/contributions'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/bills'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/bills/upcoming'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/bills/{billId}'].put.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/bills/{billId}/pay'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/bills/{billId}/pay'].patch.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='page')]").exists())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='pageable')]").isEmpty());
     }
