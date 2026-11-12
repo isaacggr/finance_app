@@ -1,5 +1,10 @@
 server:
   port: 8080
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
 
 spring:
   application:
@@ -24,27 +29,31 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
     open-in-view: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_FORMAT_SQL:false}
 
   jackson:
     serialization:
-      indent_output: true
+      indent_output: ${JACKSON_INDENT_OUTPUT:false}
 
 logging:
   level:
-    org.hibernate.SQL: debug
-    org.hibernate.type.descriptor.sql.BasicBinder: trace
+    org.hibernate.SQL: ${LOG_HIBERNATE_SQL:warn}
+    org.hibernate.orm.jdbc.bind: ${LOG_HIBERNATE_BIND:warn}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_HIBERNATE_BIND:warn}
 
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000 # 24 horas em milissegundos
 
 springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
   swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
@@ -56,6 +65,14 @@ app:
   url: ${APP_URL:http://localhost:8080}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    trust-forwarded-headers: ${RATE_LIMIT_TRUST_FORWARDED_HEADERS:false}
+    max-tracked-keys: ${RATE_LIMIT_MAX_TRACKED_KEYS:10000}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+    login-max-requests: ${RATE_LIMIT_LOGIN_MAX_REQUESTS:10}
+    verification-max-requests: ${RATE_LIMIT_VERIFICATION_MAX_REQUESTS:10}
+    email-dispatch-max-requests: ${RATE_LIMIT_EMAIL_DISPATCH_MAX_REQUESTS:5}
 
 management:
   endpoints:

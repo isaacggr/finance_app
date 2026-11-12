@@ -1,5 +1,8 @@
 package com.isaacggr.finance_app.service;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
@@ -15,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -113,31 +117,47 @@ class BillAlertServiceTest {
     }
 
     @Test
-    @DisplayName("Deve continuar o processamento caso um usuário lance exceção no envio de alerta")
+    @DisplayName("Deve continuar o processamento caso um usuário lance exceção no envio de alerta sem vazar e-mail nos logs")
     void processDailyBillAlerts_ContinuesProcessing_WhenOneUserFails() {
-        when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1, user2));
-        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
-                eq(user1.getId()), eq(BillStatus.PENDING), anyCollection()))
-                .thenThrow(new RuntimeException("Falha na consulta"));
+        Logger logger = (Logger) LoggerFactory.getLogger(BillAlertService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
 
-        Bill bill2 = new Bill(
-                user2,
-                "Energia",
-                null,
-                "MORADIA",
-                new BigDecimal("250.00"),
-                today,
-                BillRecurrence.ONCE
-        );
-        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
-                eq(user2.getId()), eq(BillStatus.PENDING), anyCollection()))
-                .thenReturn(List.of(bill2));
+        try {
+            when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1, user2));
+            when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                    eq(user1.getId()), eq(BillStatus.PENDING), anyCollection()))
+                    .thenThrow(new RuntimeException("Falha na consulta"));
 
-        billAlertService.processDailyBillAlerts();
+            Bill bill2 = new Bill(
+                    user2,
+                    "Energia",
+                    null,
+                    "MORADIA",
+                    new BigDecimal("250.00"),
+                    today,
+                    BillRecurrence.ONCE
+            );
+            when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                    eq(user2.getId()), eq(BillStatus.PENDING), anyCollection()))
+                    .thenReturn(List.of(bill2));
 
-        verify(emailService, never()).sendBillAlertEmail(eq(user1.getEmail()), any(), any(), anyInt());
-        verify(emailService, times(1)).sendBillAlertEmail(
-                eq(user2.getEmail()), eq(user2.getName()), eq(List.of(bill2)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
+            billAlertService.processDailyBillAlerts();
+
+            verify(emailService, never()).sendBillAlertEmail(eq(user1.getEmail()), any(), any(), anyInt());
+            verify(emailService, times(1)).sendBillAlertEmail(
+                    eq(user2.getEmail()), eq(user2.getName()), eq(List.of(bill2)), eq(BillAlertService.DEFAULT_DAYS_AHEAD));
+
+            String logs = appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .reduce("", (a, b) -> a + "\n" + b);
+            assertTrue(logs.contains(user1.getId().toString()));
+            assertTrue(!logs.contains(user1.getEmail()), "E-mail do usuário não deve aparecer no log de erro");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @Test

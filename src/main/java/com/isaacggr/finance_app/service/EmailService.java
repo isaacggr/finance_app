@@ -39,8 +39,10 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String toEmail, String name, String code) {
-        log.info("📧 [ATIVACAO] Código de verificação para {}: {}", toEmail, code);
+        log.info("📧 [ATIVACAO] E-mail de ativação preparado para {}", maskEmail(toEmail));
 
+        String safeName = HtmlUtils.htmlEscape(name != null ? name : "");
+        String safeCode = HtmlUtils.htmlEscape(code != null ? code : "");
         String htmlContent = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
                     <h2 style="color: #2e7d32; text-align: center;">Bem-vindo ao Finance App, %s! 💰</h2>
@@ -54,15 +56,17 @@ public class EmailService {
                     <p style="font-size: 13px; color: #616161;">Copie o código acima e confirme no aplicativo ou Swagger.</p>
                     <p style="font-size: 12px; color: #9e9e9e; margin-top: 30px;">Este código expira em 24 horas e é de uso único. Se você não solicitou este cadastro, desconsidere esta mensagem.</p>
                 </div>
-                """.formatted(name, code);
+                """.formatted(safeName, safeCode);
 
         sendHtmlEmail(toEmail, "Seu código de ativação - Finance App", htmlContent);
     }
 
     @Async
     public void sendPasswordResetEmail(String toEmail, String name, String code) {
-        log.info("🔑 [RESET SENHA] Código de recuperação para {}: {}", toEmail, code);
+        log.info("🔑 [RESET SENHA] E-mail de recuperação preparado para {}", maskEmail(toEmail));
 
+        String safeName = HtmlUtils.htmlEscape(name != null ? name : "");
+        String safeCode = HtmlUtils.htmlEscape(code != null ? code : "");
         String htmlContent = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
                     <h2 style="color: #c62828; text-align: center;">Recuperação de Senha - Finance App 🔒</h2>
@@ -76,14 +80,14 @@ public class EmailService {
                     <p style="font-size: 13px; color: #616161;">Informe este código na tela de redefinição de senha.</p>
                     <p style="font-size: 12px; color: #9e9e9e; margin-top: 30px;">Este código expira em 30 minutos e é de uso único. Se você não solicitou a redefinição, proteja sua conta.</p>
                 </div>
-                """.formatted(name, code);
+                """.formatted(safeName, safeCode);
 
         sendHtmlEmail(toEmail, "Código de Recuperação de Senha - Finance App", htmlContent);
     }
 
     @Async
     public void sendMonthlyReportEmail(String toEmail, String name, DashboardSummaryDTO summary, String periodName) {
-        log.info("📊 [RELATORIO MENSAL] Enviando relatório ({}) para {}", periodName, toEmail);
+        log.info("📊 [RELATORIO MENSAL] Enviando relatório ({}) para {}", periodName, maskEmail(toEmail));
 
         String incomeFormatted = formatCurrency(summary.totalIncome());
         String expenseFormatted = formatCurrency(summary.totalExpense());
@@ -104,15 +108,18 @@ public class EmailService {
                     """);
         } else {
             for (CategoryExpenseDTO cat : summary.expensesByCategory()) {
+                String safeCategory = HtmlUtils.htmlEscape(cat.category() != null ? cat.category() : "");
                 categoryRows.append("""
                         <tr style="border-bottom: 1px solid #f0f0f0;">
                             <td style="padding: 10px 14px; color: #424242; font-weight: 500;">%s</td>
                             <td style="padding: 10px 14px; text-align: right; font-weight: bold; color: #c62828;">%s</td>
                         </tr>
-                        """.formatted(cat.category(), formatCurrency(cat.total())));
+                        """.formatted(safeCategory, formatCurrency(cat.total())));
             }
         }
 
+        String safePeriod = HtmlUtils.htmlEscape(periodName != null ? periodName : "");
+        String safeName = HtmlUtils.htmlEscape(name != null ? name : "");
         String htmlContent = """
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
                     <div style="text-align: center; border-bottom: 2px solid #f5f5f5; padding-bottom: 16px; margin-bottom: 20px;">
@@ -165,8 +172,8 @@ public class EmailService {
                     </div>
                 </div>
                 """.formatted(
-                periodName,
-                name,
+                safePeriod,
+                safeName,
                 incomeFormatted,
                 expenseFormatted,
                 balanceBg,
@@ -181,7 +188,7 @@ public class EmailService {
 
     @Async
     public void sendBillAlertEmail(String toEmail, String name, List<Bill> upcomingBills, int daysAhead) {
-        log.info("🔔 [ALERTA CONTAS] Enviando alerta de {} conta(s) para {}", upcomingBills.size(), toEmail);
+        log.info("🔔 [ALERTA CONTAS] Enviando alerta de {} conta(s) para {}", upcomingBills.size(), maskEmail(toEmail));
 
         BigDecimal totalUpcoming = upcomingBills.stream()
                 .map(Bill::getAmount)
@@ -290,10 +297,25 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("E-mail enviado com sucesso para: {}", to);
+            log.info("E-mail enviado com sucesso para {}", maskEmail(to));
         } catch (MessagingException | RuntimeException ex) {
-            log.error("Falha ao enviar e-mail para {}: {}", to, ex.getMessage(), ex);
+            log.error("Falha ao enviar e-mail para {} ({}): {}", maskEmail(to), ex.getClass().getSimpleName(), ex.getMessage());
         }
+    }
+
+    static String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "***";
+        }
+        String trimmed = email.trim();
+        int atIndex = trimmed.indexOf('@');
+        if (atIndex <= 0 || atIndex == trimmed.length() - 1) {
+            return "***";
+        }
+        String local = trimmed.substring(0, atIndex);
+        String domain = trimmed.substring(atIndex + 1);
+        String visiblePrefix = local.length() <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+        return visiblePrefix + "***@" + domain;
     }
 }
 

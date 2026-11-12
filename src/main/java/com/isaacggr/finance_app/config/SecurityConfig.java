@@ -3,16 +3,20 @@ package com.isaacggr.finance_app.config;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
+@EnableConfigurationProperties(RateLimitProperties.class)
 public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
@@ -45,7 +50,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, RateLimitFilter rateLimitFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
@@ -82,12 +87,24 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/users").permitAll()
                 .anyRequest().authenticated()
             )
-            .headers(headers ->
-                headers.frameOptions(frame -> frame.sameOrigin())
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.deny())
+                .contentTypeOptions(Customizer.withDefaults())
+                .referrerPolicy(referrer -> referrer.policy(
+                        ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
             )
+            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter rateLimitFilter) {
+        // Evita execução duplicada fora da SecurityFilterChain; dentro da chain roda após o CorsFilter.
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(rateLimitFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -102,7 +119,13 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Location", "WWW-Authenticate"));
+        configuration.setExposedHeaders(List.of(
+                "Location",
+                "WWW-Authenticate",
+                "Retry-After",
+                "X-RateLimit-Limit",
+                "X-RateLimit-Remaining"
+        ));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

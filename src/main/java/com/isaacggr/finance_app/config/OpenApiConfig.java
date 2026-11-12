@@ -80,6 +80,11 @@ public class OpenApiConfig {
         return (operation, handlerMethod) -> {
             if (isPublicEndpoint(handlerMethod)) {
                 operation.setSecurity(List.of());
+                addErrorResponseIfAbsent(
+                        operation,
+                        "429",
+                        "Limite de requisições excedido para proteção contra força bruta/abuso. Aguarde o tempo indicado no header Retry-After."
+                );
             } else {
                 addErrorResponseIfAbsent(
                         operation,

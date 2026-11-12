@@ -74,7 +74,7 @@ public class MonthlyReportService {
                     notificationService.notifyMonthlyReportReady(user, periodName, summary.balance());
                 }
             } catch (Exception ex) {
-                log.error("Erro ao gerar relatório mensal para o usuário {}: {}", user.getEmail(), ex.getMessage());
+                log.error("Erro ao gerar relatório mensal para o usuário id={}: {}", user.getId(), ex.getMessage());
             }
         }
 

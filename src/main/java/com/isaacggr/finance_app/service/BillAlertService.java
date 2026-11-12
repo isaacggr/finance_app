@@ -93,7 +93,7 @@ public class BillAlertService {
                     }
                 }
             } catch (Exception ex) {
-                log.error("Erro ao processar alertas de contas para o usuário {}: {}", user.getEmail(), ex.getMessage());
+                log.error("Erro ao processar alertas de contas para o usuário id={}: {}", user.getId(), ex.getMessage());
             }
         }
 

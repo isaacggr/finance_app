@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -122,10 +123,124 @@ class SecurityConfigTest extends AbstractWebIntegrationTest {
     void shouldExposeOnlyHealthEndpointPublicly() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
                 .andExpect(jsonPath("$.status").value("UP"));
 
         mockMvc.perform(get("/actuator/env"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
+    }
+
+    @Test
+    @DisplayName("Deve aplicar Rate Limit em POST /auth/login após 10 tentativas preservando headers CORS e Retry-After")
+    void shouldRateLimitLoginAndPreserveCorsHeaders() throws Exception {
+        String ip = "198.51.100.10";
+        when(userRepository.findByEmail("bruteforce@example.com")).thenReturn(Optional.empty());
+
+        for (int i = 1; i <= 10; i++) {
+            mockMvc.perform(post("/auth/login")
+                            .with(req -> {
+                                req.setRemoteAddr(ip);
+                                return req;
+                            })
+                            .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"bruteforce@example.com\",\"password\":\"Errada123\"}"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(header().string("X-RateLimit-Limit", "10"))
+                    .andExpect(header().string("X-RateLimit-Remaining", String.valueOf(10 - i)));
+        }
+
+        // 11ª tentativa no mesmo IP recebe 429 mantendo cabeçalhos CORS para o front-end ler a resposta
+        mockMvc.perform(post("/auth/login")
+                        .with(req -> {
+                            req.setRemoteAddr(ip);
+                            return req;
+                        })
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"bruteforce@example.com\",\"password\":\"Errada123\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(header().string("X-RateLimit-Limit", "10"))
+                .andExpect(header().string("X-RateLimit-Remaining", "0"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, containsString("Retry-After")))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.message").exists());
+
+        // Preflight CORS e rotas privadas autenticadas não devem ficar bloqueados pelo limite de /auth/login
+        mockMvc.perform(options("/auth/login")
+                        .with(req -> {
+                            req.setRemoteAddr(ip);
+                            return req;
+                        })
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+                .andExpect(status().isOk());
+
+        User user = createVerifiedUser("Isaac", "isaac.ratelimit@example.com", "Senha123!");
+        String jwt = tokenService.generateToken(user);
+        when(userRepository.findByIdAndDeletedFalse(user.getId())).thenReturn(Optional.of(user));
+        when(transactionRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/transactions")
+                        .with(req -> {
+                            req.setRemoteAddr(ip);
+                            return req;
+                        })
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Deve aplicar Rate Limit estrito (5 req/min) em POST /users e POST /auth/forgot-password")
+    void shouldRateLimitUserRegistrationAndForgotPassword() throws Exception {
+        String registerIp = "198.51.100.11";
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/users")
+                            .with(req -> {
+                                req.setRemoteAddr(registerIp);
+                                return req;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(post("/users")
+                        .with(req -> {
+                            req.setRemoteAddr(registerIp);
+                            return req;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("X-RateLimit-Limit", "5"));
+
+        String forgotIp = "198.51.100.12";
+        when(userRepository.findByEmail("naoexiste@example.com")).thenReturn(Optional.empty());
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/auth/forgot-password")
+                            .with(req -> {
+                                req.setRemoteAddr(forgotIp);
+                                return req;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"naoexiste@example.com\"}"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/auth/forgot-password")
+                        .with(req -> {
+                            req.setRemoteAddr(forgotIp);
+                            return req;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"naoexiste@example.com\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("X-RateLimit-Limit", "5"));
     }
 }
