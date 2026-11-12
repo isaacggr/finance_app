@@ -1,10 +1,8 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.dto.NotificationReadAllResponseDTO;
-import com.isaacggr.finance_app.dto.NotificationResponseDTO;
-import com.isaacggr.finance_app.dto.PageResponseDTO;
-import com.isaacggr.finance_app.dto.UnreadNotificationsCountDTO;
+import com.isaacggr.finance_app.dto.common.PageResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationResponseDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,7 +49,7 @@ public class NotificationController {
     @GetMapping("/unread-count")
     @Operation(summary = "Contar notificações não lidas", description = "Retorna apenas a contagem total de notificações não lidas para o badge do sino")
     @ApiResponse(responseCode = "200", description = "Contagem retornada com sucesso")
-    public ResponseEntity<UnreadNotificationsCountDTO> countUnread(
+    public ResponseEntity<NotificationResponseDTO.UnreadCount> countUnread(
             @AuthenticationPrincipal User user
     ) {
         return ResponseEntity.ok(notificationService.countUnread(user.getId()));
@@ -72,7 +70,7 @@ public class NotificationController {
     @PatchMapping("/read-all")
     @Operation(summary = "Marcar todas as notificações como lidas", description = "Marca todas as notificações não lidas do usuário autenticado como lidas em lote")
     @ApiResponse(responseCode = "200", description = "Notificações atualizadas com sucesso")
-    public ResponseEntity<NotificationReadAllResponseDTO> markAllAsRead(
+    public ResponseEntity<NotificationResponseDTO.ReadAllResult> markAllAsRead(
             @AuthenticationPrincipal User user
     ) {
         return ResponseEntity.ok(notificationService.markAllAsRead(user.getId()));

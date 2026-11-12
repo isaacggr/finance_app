@@ -2,8 +2,7 @@ package com.isaacggr.finance_app.repository;
 
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
-import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
+import com.isaacggr.finance_app.dto.dashboard.CategoryExpenseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -43,7 +42,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
     // 📊 Detalhamento de gastos por categoria em um intervalo de datas
     @Query("""
-        SELECT new com.isaacggr.finance_app.dto.CategoryExpenseDTO(t.category, SUM(t.amount))
+        SELECT new com.isaacggr.finance_app.dto.dashboard.CategoryExpenseDTO(t.category, SUM(t.amount))
         FROM Transaction t
         WHERE t.user.id = :userId
           AND t.type = :type
@@ -77,7 +76,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
     );
 
     @Query("""
-        SELECT new com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO(t.date, t.type, SUM(t.amount))
+        SELECT new com.isaacggr.finance_app.repository.TransactionRepository$DailyAggregate(t.date, t.type, SUM(t.amount))
         FROM Transaction t
         WHERE t.user.id = :userId
           AND t.date >= :startDate
@@ -85,7 +84,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
         GROUP BY t.date, t.type
         ORDER BY t.date ASC
     """)
-    List<DailyTransactionAggregateDTO> aggregateByDateAndType(
+    List<DailyAggregate> aggregateByDateAndType(
             @Param("userId") UUID userId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
@@ -99,4 +98,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             @Param("userId") UUID userId,
             @Param("type") TransactionType type
     );
+
+    /**
+     * Projeção JPQL agregada por data e tipo para composição eficiente de séries temporais.
+     */
+    record DailyAggregate(
+            LocalDate date,
+            TransactionType type,
+            BigDecimal total
+    ) {
+    }
 }

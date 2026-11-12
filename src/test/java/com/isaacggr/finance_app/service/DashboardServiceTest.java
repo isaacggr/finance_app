@@ -3,10 +3,9 @@ package com.isaacggr.finance_app.service;
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.enums.TimeSeriesGranularity;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
-import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
-import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
-import com.isaacggr.finance_app.dto.DashboardTimeseriesDTO;
+import com.isaacggr.finance_app.dto.dashboard.CategoryExpenseDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardTimeseriesDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
@@ -130,8 +129,8 @@ class DashboardServiceTest {
 
         when(transactionRepository.aggregateByDateAndType(userId, start, end))
                 .thenReturn(List.of(
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 1), TransactionType.INCOME, new BigDecimal("1000.00")),
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 3), TransactionType.EXPENSE, new BigDecimal("250.00"))
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 11, 1), TransactionType.INCOME, new BigDecimal("1000.00")),
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 11, 3), TransactionType.EXPENSE, new BigDecimal("250.00"))
                 ));
 
         DashboardTimeseriesDTO series = dashboardService.getTimeseries(userId, start, end, null);
@@ -161,9 +160,9 @@ class DashboardServiceTest {
 
         when(transactionRepository.aggregateByDateAndType(userId, start, end))
                 .thenReturn(List.of(
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 9, 5), TransactionType.INCOME, new BigDecimal("3000.00")),
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 9, 10), TransactionType.EXPENSE, new BigDecimal("1200.00")),
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 1), TransactionType.EXPENSE, new BigDecimal("500.00"))
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 9, 5), TransactionType.INCOME, new BigDecimal("3000.00")),
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 9, 10), TransactionType.EXPENSE, new BigDecimal("1200.00")),
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 11, 1), TransactionType.EXPENSE, new BigDecimal("500.00"))
                 ));
 
         DashboardTimeseriesDTO series = dashboardService.getTimeseries(userId, start, end, null);

@@ -1,7 +1,7 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.CategoryOptionDTO;
+import com.isaacggr.finance_app.dto.category.CategoryOptionDTO;
 import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;

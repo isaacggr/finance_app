@@ -2,8 +2,8 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.enums.TimeSeriesGranularity;
-import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
-import com.isaacggr.finance_app.dto.DashboardTimeseriesDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardTimeseriesDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;

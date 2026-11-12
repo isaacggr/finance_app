@@ -1,10 +1,10 @@
 package com.isaacggr.finance_app.controller;
 
-import com.isaacggr.finance_app.dto.ForgotPasswordRequestDTO;
-import com.isaacggr.finance_app.dto.LoginRequestDTO;
-import com.isaacggr.finance_app.dto.LoginResponseDTO;
-import com.isaacggr.finance_app.dto.ResetPasswordRequestDTO;
-import com.isaacggr.finance_app.dto.VerifyEmailRequestDTO;
+import com.isaacggr.finance_app.dto.auth.ForgotPasswordRequestDTO;
+import com.isaacggr.finance_app.dto.auth.LoginRequestDTO;
+import com.isaacggr.finance_app.dto.auth.LoginResponseDTO;
+import com.isaacggr.finance_app.dto.auth.ResetPasswordRequestDTO;
+import com.isaacggr.finance_app.dto.auth.VerifyEmailRequestDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;

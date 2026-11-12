@@ -1,11 +1,11 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.dto.GoalContributionCreateDTO;
-import com.isaacggr.finance_app.dto.GoalContributionResponseDTO;
-import com.isaacggr.finance_app.dto.GoalCreateDTO;
-import com.isaacggr.finance_app.dto.GoalResponseDTO;
-import com.isaacggr.finance_app.dto.GoalUpdateDTO;
+import com.isaacggr.finance_app.dto.goal.GoalContributionCreateDTO;
+import com.isaacggr.finance_app.dto.goal.GoalContributionResponseDTO;
+import com.isaacggr.finance_app.dto.goal.GoalCreateDTO;
+import com.isaacggr.finance_app.dto.goal.GoalResponseDTO;
+import com.isaacggr.finance_app.dto.goal.GoalUpdateDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.GoalService;
 import io.swagger.v3.oas.annotations.Operation;

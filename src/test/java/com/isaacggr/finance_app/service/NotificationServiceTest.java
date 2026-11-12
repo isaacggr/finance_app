@@ -7,9 +7,8 @@ import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.domain.enums.NotificationType;
-import com.isaacggr.finance_app.dto.NotificationReadAllResponseDTO;
-import com.isaacggr.finance_app.dto.NotificationResponseDTO;
-import com.isaacggr.finance_app.dto.PageResponseDTO;
+import com.isaacggr.finance_app.dto.common.PageResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationResponseDTO;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,7 +122,7 @@ class NotificationServiceTest {
         assertTrue(readDto.read());
         assertNotNull(readDto.readAt());
 
-        NotificationReadAllResponseDTO allDto = notificationService.markAllAsRead(userId);
+        NotificationResponseDTO.ReadAllResult allDto = notificationService.markAllAsRead(userId);
         assertEquals(3, allDto.updatedCount());
 
         notificationService.delete(notifId, userId);

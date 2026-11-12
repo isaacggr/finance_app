@@ -2,7 +2,7 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.CategoryOptionDTO;
+import com.isaacggr.finance_app.dto.category.CategoryOptionDTO;
 import com.isaacggr.finance_app.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

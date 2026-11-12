@@ -4,13 +4,9 @@ import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.enums.TimeSeriesGranularity;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
-import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
-import com.isaacggr.finance_app.dto.DashboardPreviousPeriodDTO;
-import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
-import com.isaacggr.finance_app.dto.DashboardTimeseriesDTO;
-import com.isaacggr.finance_app.dto.DashboardTimeseriesPointDTO;
-import com.isaacggr.finance_app.dto.DashboardVariationDTO;
+import com.isaacggr.finance_app.dto.dashboard.CategoryExpenseDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardTimeseriesDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.repository.TransactionRepository;
@@ -84,7 +80,7 @@ public class DashboardService {
 
         BigDecimal previousBalance = normalizeScale(previousIncome.subtract(previousExpense));
 
-        DashboardPreviousPeriodDTO previous = new DashboardPreviousPeriodDTO(
+        DashboardSummaryDTO.PreviousPeriod previous = new DashboardSummaryDTO.PreviousPeriod(
                 prevStart,
                 prevEnd,
                 previousIncome,
@@ -92,7 +88,7 @@ public class DashboardService {
                 previousBalance
         );
 
-        DashboardVariationDTO variation = new DashboardVariationDTO(
+        DashboardSummaryDTO.Variation variation = new DashboardSummaryDTO.Variation(
                 calculatePercentageVariation(totalIncome, previousIncome),
                 calculatePercentageVariation(totalExpense, previousExpense),
                 calculatePercentageVariation(balance, previousBalance),
@@ -143,11 +139,11 @@ public class DashboardService {
 
         validateRangeLimit(effectiveStartDate, effectiveEndDate, effectiveGranularity, spanDays);
 
-        List<DailyTransactionAggregateDTO> rows = transactionRepository.aggregateByDateAndType(
+        List<TransactionRepository.DailyAggregate> rows = transactionRepository.aggregateByDateAndType(
                 userId, effectiveStartDate, effectiveEndDate
         );
 
-        List<DashboardTimeseriesPointDTO> points = (effectiveGranularity == TimeSeriesGranularity.DAILY)
+        List<DashboardTimeseriesDTO.Point> points = (effectiveGranularity == TimeSeriesGranularity.DAILY)
                 ? buildDailyPoints(effectiveStartDate, effectiveEndDate, rows)
                 : buildMonthlyPoints(effectiveStartDate, effectiveEndDate, rows);
 
@@ -177,16 +173,16 @@ public class DashboardService {
         }
     }
 
-    private List<DashboardTimeseriesPointDTO> buildDailyPoints(
+    private List<DashboardTimeseriesDTO.Point> buildDailyPoints(
             LocalDate startDate,
             LocalDate endDate,
-            List<DailyTransactionAggregateDTO> rows
+            List<TransactionRepository.DailyAggregate> rows
     ) {
         Map<LocalDate, BigDecimal> incomeMap = new HashMap<>();
         Map<LocalDate, BigDecimal> expenseMap = new HashMap<>();
 
         if (rows != null) {
-            for (DailyTransactionAggregateDTO row : rows) {
+            for (TransactionRepository.DailyAggregate row : rows) {
                 if (row.type() == TransactionType.INCOME) {
                     incomeMap.merge(row.date(), coalesceZero(row.total()), BigDecimal::add);
                 } else if (row.type() == TransactionType.EXPENSE) {
@@ -195,7 +191,7 @@ public class DashboardService {
             }
         }
 
-        List<DashboardTimeseriesPointDTO> points = new ArrayList<>();
+        List<DashboardTimeseriesDTO.Point> points = new ArrayList<>();
         BigDecimal cumulative = normalizeScale(BigDecimal.ZERO);
 
         for (LocalDate cursor = startDate; !cursor.isAfter(endDate); cursor = cursor.plusDays(1)) {
@@ -204,7 +200,7 @@ public class DashboardService {
             BigDecimal balance = normalizeScale(income.subtract(expense));
             cumulative = normalizeScale(cumulative.add(balance));
 
-            points.add(new DashboardTimeseriesPointDTO(
+            points.add(new DashboardTimeseriesDTO.Point(
                     cursor.toString(),
                     cursor,
                     income,
@@ -217,16 +213,16 @@ public class DashboardService {
         return points;
     }
 
-    private List<DashboardTimeseriesPointDTO> buildMonthlyPoints(
+    private List<DashboardTimeseriesDTO.Point> buildMonthlyPoints(
             LocalDate startDate,
             LocalDate endDate,
-            List<DailyTransactionAggregateDTO> rows
+            List<TransactionRepository.DailyAggregate> rows
     ) {
         Map<YearMonth, BigDecimal> incomeMap = new HashMap<>();
         Map<YearMonth, BigDecimal> expenseMap = new HashMap<>();
 
         if (rows != null) {
-            for (DailyTransactionAggregateDTO row : rows) {
+            for (TransactionRepository.DailyAggregate row : rows) {
                 YearMonth ym = YearMonth.from(row.date());
                 if (row.type() == TransactionType.INCOME) {
                     incomeMap.merge(ym, coalesceZero(row.total()), BigDecimal::add);
@@ -236,7 +232,7 @@ public class DashboardService {
             }
         }
 
-        List<DashboardTimeseriesPointDTO> points = new ArrayList<>();
+        List<DashboardTimeseriesDTO.Point> points = new ArrayList<>();
         BigDecimal cumulative = normalizeScale(BigDecimal.ZERO);
 
         YearMonth startYm = YearMonth.from(startDate);
@@ -248,7 +244,7 @@ public class DashboardService {
             BigDecimal balance = normalizeScale(income.subtract(expense));
             cumulative = normalizeScale(cumulative.add(balance));
 
-            points.add(new DashboardTimeseriesPointDTO(
+            points.add(new DashboardTimeseriesDTO.Point(
                     cursor.toString(),
                     cursor.atDay(1),
                     income,

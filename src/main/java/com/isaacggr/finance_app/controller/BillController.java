@@ -2,11 +2,11 @@ package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.enums.BillStatus;
-import com.isaacggr.finance_app.dto.BillCreateDTO;
-import com.isaacggr.finance_app.dto.BillPayRequestDTO;
-import com.isaacggr.finance_app.dto.BillPayResponseDTO;
-import com.isaacggr.finance_app.dto.BillResponseDTO;
-import com.isaacggr.finance_app.dto.BillUpdateDTO;
+import com.isaacggr.finance_app.dto.bill.BillCreateDTO;
+import com.isaacggr.finance_app.dto.bill.BillPayRequestDTO;
+import com.isaacggr.finance_app.dto.bill.BillPayResponseDTO;
+import com.isaacggr.finance_app.dto.bill.BillResponseDTO;
+import com.isaacggr.finance_app.dto.bill.BillUpdateDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.BillService;
 import io.swagger.v3.oas.annotations.Operation;

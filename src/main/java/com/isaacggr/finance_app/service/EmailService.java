@@ -1,8 +1,8 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Bill;
-import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
-import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.dashboard.CategoryExpenseDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardSummaryDTO;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;

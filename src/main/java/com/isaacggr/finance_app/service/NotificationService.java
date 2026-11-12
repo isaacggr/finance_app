@@ -7,10 +7,8 @@ import com.isaacggr.finance_app.domain.entity.Notification;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.enums.NotificationType;
-import com.isaacggr.finance_app.dto.NotificationReadAllResponseDTO;
-import com.isaacggr.finance_app.dto.NotificationResponseDTO;
-import com.isaacggr.finance_app.dto.PageResponseDTO;
-import com.isaacggr.finance_app.dto.UnreadNotificationsCountDTO;
+import com.isaacggr.finance_app.dto.common.PageResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationResponseDTO;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.NotificationRepository;
 import org.springframework.data.domain.Page;
@@ -62,8 +60,8 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public UnreadNotificationsCountDTO countUnread(UUID userId) {
-        return new UnreadNotificationsCountDTO(notificationRepository.countByUserIdAndReadFalse(userId));
+    public NotificationResponseDTO.UnreadCount countUnread(UUID userId) {
+        return new NotificationResponseDTO.UnreadCount(notificationRepository.countByUserIdAndReadFalse(userId));
     }
 
     public NotificationResponseDTO markAsRead(UUID notificationId, UUID userId) {
@@ -75,9 +73,9 @@ public class NotificationService {
         return NotificationResponseDTO.fromEntity(notification);
     }
 
-    public NotificationReadAllResponseDTO markAllAsRead(UUID userId) {
+    public NotificationResponseDTO.ReadAllResult markAllAsRead(UUID userId) {
         int updatedCount = notificationRepository.markAllAsReadByUserId(userId, LocalDateTime.now());
-        return new NotificationReadAllResponseDTO(updatedCount);
+        return new NotificationResponseDTO.ReadAllResult(updatedCount);
     }
 
     public void delete(UUID notificationId, UUID userId) {

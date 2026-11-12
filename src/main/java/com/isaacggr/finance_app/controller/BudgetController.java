@@ -1,10 +1,10 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.dto.BudgetCreateDTO;
-import com.isaacggr.finance_app.dto.BudgetProgressDTO;
-import com.isaacggr.finance_app.dto.BudgetResponseDTO;
-import com.isaacggr.finance_app.dto.BudgetUpdateDTO;
+import com.isaacggr.finance_app.dto.budget.BudgetCreateDTO;
+import com.isaacggr.finance_app.dto.budget.BudgetProgressDTO;
+import com.isaacggr.finance_app.dto.budget.BudgetResponseDTO;
+import com.isaacggr.finance_app.dto.budget.BudgetUpdateDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.BudgetService;
 import io.swagger.v3.oas.annotations.Operation;

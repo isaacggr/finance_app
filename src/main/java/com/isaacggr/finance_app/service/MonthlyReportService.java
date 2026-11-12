@@ -3,7 +3,7 @@ package com.isaacggr.finance_app.service;
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
-import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.dashboard.DashboardSummaryDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.repository.UserRepository;
 import org.slf4j.Logger;

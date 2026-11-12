@@ -12,7 +12,7 @@ import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.domain.enums.NotificationType;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
+import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -601,8 +601,8 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
 
         when(transactionRepository.aggregateByDateAndType(userId, start, end))
                 .thenReturn(List.of(
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 1), TransactionType.INCOME, new BigDecimal("1500.00")),
-                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 3), TransactionType.EXPENSE, new BigDecimal("500.00"))
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 11, 1), TransactionType.INCOME, new BigDecimal("1500.00")),
+                        new TransactionRepository.DailyAggregate(LocalDate.of(2026, 11, 3), TransactionType.EXPENSE, new BigDecimal("500.00"))
                 ));
 
         mockMvc.perform(get("/dashboard/timeseries")

@@ -1,12 +1,12 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
-import com.isaacggr.finance_app.dto.NotificationPreferenceResponseDTO;
-import com.isaacggr.finance_app.dto.NotificationPreferenceUpdateDTO;
-import com.isaacggr.finance_app.dto.UserCreateDTO;
-import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
-import com.isaacggr.finance_app.dto.UserProfileUpdateDTO;
-import com.isaacggr.finance_app.dto.UserResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationPreferenceResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationPreferenceUpdateDTO;
+import com.isaacggr.finance_app.dto.user.UserCreateDTO;
+import com.isaacggr.finance_app.dto.user.UserPasswordUpdateDTO;
+import com.isaacggr.finance_app.dto.user.UserProfileUpdateDTO;
+import com.isaacggr.finance_app.dto.user.UserResponseDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.NotificationPreferenceService;
 import com.isaacggr.finance_app.service.UserService;

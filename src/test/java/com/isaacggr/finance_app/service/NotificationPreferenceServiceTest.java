@@ -2,8 +2,8 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
-import com.isaacggr.finance_app.dto.NotificationPreferenceResponseDTO;
-import com.isaacggr.finance_app.dto.NotificationPreferenceUpdateDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationPreferenceResponseDTO;
+import com.isaacggr.finance_app.dto.notification.NotificationPreferenceUpdateDTO;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.UserNotificationPreferenceRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
