@@ -4,10 +4,15 @@ import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.Budget;
 import com.isaacggr.finance_app.domain.entity.Goal;
 import com.isaacggr.finance_app.domain.entity.GoalContribution;
+import com.isaacggr.finance_app.domain.entity.Notification;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
+import com.isaacggr.finance_app.domain.enums.NotificationType;
+import com.isaacggr.finance_app.domain.enums.TransactionType;
+import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
 import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -16,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,6 +38,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -541,6 +548,178 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("GET /categories deve retornar sugestões acentuadas + customizadas do usuário e exigir autenticação")
+    void categoriesEndpoint_ReturnsHybridCatalogAndProtectsRoute() throws Exception {
+        mockMvc.perform(get("/categories"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"));
+
+        when(transactionRepository.findDistinctCategoriesByUserId(userId))
+                .thenReturn(List.of("ALIMENTAÇÃO", "IFOOD"));
+        when(budgetRepository.findDistinctCategoriesByUserId(userId))
+                .thenReturn(List.of("MORADIA"));
+        when(billRepository.findDistinctCategoriesByUserId(userId))
+                .thenReturn(List.of("ACADEMIA"));
+
+        mockMvc.perform(get("/categories")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name=='ALIMENTAÇÃO')].label").value("Alimentação"))
+                .andExpect(jsonPath("$[?(@.name=='ALIMENTAÇÃO')].usedByUser").value(true))
+                .andExpect(jsonPath("$[?(@.name=='ALIMENTAÇÃO')].defaultSuggested").value(true))
+                .andExpect(jsonPath("$[?(@.name=='IFOOD')].defaultSuggested").value(false))
+                .andExpect(jsonPath("$[?(@.name=='ACADEMIA')].usedByUser").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /dashboard/summary (previous/variation) e /dashboard/timeseries devem retornar séries e validações")
+    void dashboardSummaryVariationAndTimeseriesEndpoints_WorkAsExpected() throws Exception {
+        LocalDate start = LocalDate.of(2026, 11, 1);
+        LocalDate end = LocalDate.of(2026, 11, 3);
+        LocalDate prevStart = LocalDate.of(2026, 10, 29);
+        LocalDate prevEnd = LocalDate.of(2026, 10, 31);
+
+        when(transactionRepository.sumAmountByTypeAndPeriod(userId, TransactionType.INCOME, start, end))
+                .thenReturn(new BigDecimal("1500.00"));
+        when(transactionRepository.sumAmountByTypeAndPeriod(userId, TransactionType.EXPENSE, start, end))
+                .thenReturn(new BigDecimal("500.00"));
+        when(transactionRepository.sumAmountByTypeAndPeriod(userId, TransactionType.INCOME, prevStart, prevEnd))
+                .thenReturn(new BigDecimal("1000.00"));
+        when(transactionRepository.sumAmountByTypeAndPeriod(userId, TransactionType.EXPENSE, prevStart, prevEnd))
+                .thenReturn(new BigDecimal("400.00"));
+        when(transactionRepository.sumAmountByCategory(userId, TransactionType.EXPENSE, start, end))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/dashboard/summary")
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-03")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previous.totalIncome").value(1000.0))
+                .andExpect(jsonPath("$.variation.incomePercentage").value(50.0))
+                .andExpect(jsonPath("$.variation.balanceDifference").value(400.0));
+
+        when(transactionRepository.aggregateByDateAndType(userId, start, end))
+                .thenReturn(List.of(
+                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 1), TransactionType.INCOME, new BigDecimal("1500.00")),
+                        new DailyTransactionAggregateDTO(LocalDate.of(2026, 11, 3), TransactionType.EXPENSE, new BigDecimal("500.00"))
+                ));
+
+        mockMvc.perform(get("/dashboard/timeseries")
+                        .param("startDate", "2026-11-01")
+                        .param("endDate", "2026-11-03")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.granularity").value("DAILY"))
+                .andExpect(jsonPath("$.points.length()").value(3))
+                .andExpect(jsonPath("$.points[1].period").value("2026-11-02"))
+                .andExpect(jsonPath("$.points[1].cumulativeBalance").value(1500.0))
+                .andExpect(jsonPath("$.points[2].cumulativeBalance").value(1000.0));
+
+        mockMvc.perform(get("/dashboard/timeseries")
+                        .param("startDate", "2026-11-10")
+                        .param("endDate", "2026-11-01")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("Endpoints de /users/me/notification-preferences e /notifications devem operar com Zero IDOR")
+    void notificationPreferencesAndNotificationsEndpoints_LifecycleWorks() throws Exception {
+        when(userNotificationPreferenceRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        mockMvc.perform(get("/users/me/notification-preferences")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.billAlertsEmailEnabled").value(true))
+                .andExpect(jsonPath("$.billAlertDaysBefore").value(3));
+
+        when(userNotificationPreferenceRepository.save(any(UserNotificationPreference.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        mockMvc.perform(put("/users/me/notification-preferences")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "billAlertsEmailEnabled": false,
+                                  "billAlertsInAppEnabled": true,
+                                  "billAlertDaysBefore": 5,
+                                  "monthlyReportEmailEnabled": false,
+                                  "monthlyReportInAppEnabled": true,
+                                  "budgetAlertsInAppEnabled": true,
+                                  "goalAlertsInAppEnabled": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.billAlertsEmailEnabled").value(false))
+                .andExpect(jsonPath("$.billAlertDaysBefore").value(5))
+                .andExpect(jsonPath("$.goalAlertsInAppEnabled").value(false));
+
+        mockMvc.perform(put("/users/me/notification-preferences")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "billAlertsEmailEnabled": true,
+                                  "billAlertsInAppEnabled": true,
+                                  "billAlertDaysBefore": 0,
+                                  "monthlyReportEmailEnabled": true,
+                                  "monthlyReportInAppEnabled": true,
+                                  "budgetAlertsInAppEnabled": true,
+                                  "goalAlertsInAppEnabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.billAlertDaysBefore").exists());
+
+        UUID notifId = UUID.randomUUID();
+        Notification notif = new Notification(
+                authenticatedUser, NotificationType.BILL_DUE_TODAY,
+                "Conta vence hoje", "Sua conta vence hoje", "BILL", UUID.randomUUID(), "KEY_1"
+        );
+        ReflectionTestUtils.setField(notif, "id", notifId);
+
+        when(notificationRepository.findByUserIdAndReadFalse(eq(userId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(notif)));
+        when(notificationRepository.countByUserIdAndReadFalse(userId)).thenReturn(1L);
+        when(notificationRepository.findByIdAndUserId(notifId, userId)).thenReturn(Optional.of(notif));
+        when(notificationRepository.save(notif)).thenReturn(notif);
+        when(notificationRepository.markAllAsReadByUserId(eq(userId), any())).thenReturn(1);
+
+        mockMvc.perform(get("/notifications")
+                        .param("unreadOnly", "true")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(notifId.toString()))
+                .andExpect(jsonPath("$.content[0].read").value(false));
+
+        mockMvc.perform(get("/notifications/unread-count")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").value(1));
+
+        mockMvc.perform(patch("/notifications/" + notifId + "/read")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.read").value(true));
+
+        mockMvc.perform(patch("/notifications/read-all")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(1));
+
+        UUID foreignId = UUID.randomUUID();
+        when(notificationRepository.findByIdAndUserId(foreignId, userId)).thenReturn(Optional.empty());
+        mockMvc.perform(patch("/notifications/" + foreignId + "/read")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(delete("/notifications/" + notifId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNoContent());
+        verify(notificationRepository).delete(notif);
+    }
+
+    @Test
     @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable, expor PATCH /users/me e documentar respostas de erro")
     void openApiSpec_FlattensPageableAndDocumentsErrorsAndProfileEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
@@ -557,6 +736,15 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
                 .andExpect(jsonPath("$.paths['/users/me'].patch.responses['401']").exists())
                 .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/users/me/password'].patch.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/users/me/notification-preferences'].get.responses['401']").exists())
+                .andExpect(jsonPath("$.paths['/users/me/notification-preferences'].put.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/categories'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/dashboard/timeseries'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/notifications'].get.parameters[?(@.name=='page')]").exists())
+                .andExpect(jsonPath("$.paths['/notifications'].get.parameters[?(@.name=='pageable')]").isEmpty())
+                .andExpect(jsonPath("$.paths['/notifications/unread-count'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/notifications/{notificationId}/read'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/notifications/read-all'].patch.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/goals'].post.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/goals/primary'].get.responses['204']").exists())
                 .andExpect(jsonPath("$.paths['/goals/{goalId}/primary'].patch.responses['404']").exists())

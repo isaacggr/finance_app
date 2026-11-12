@@ -23,6 +23,22 @@ public record DashboardSummaryDTO(
         BigDecimal balance,
 
         @Schema(description = "Detalhamento de gastos agrupados por categoria")
-        List<CategoryExpenseDTO> expensesByCategory
+        List<CategoryExpenseDTO> expensesByCategory,
+
+        @Schema(description = "Totais consolidados do período anterior equivalente para comparação")
+        DashboardPreviousPeriodDTO previous,
+
+        @Schema(description = "Variações percentuais e absolutas em relação ao período anterior")
+        DashboardVariationDTO variation
 ) {
+    public DashboardSummaryDTO(
+            LocalDate startDate,
+            LocalDate endDate,
+            BigDecimal totalIncome,
+            BigDecimal totalExpense,
+            BigDecimal balance,
+            List<CategoryExpenseDTO> expensesByCategory
+    ) {
+        this(startDate, endDate, totalIncome, totalExpense, balance, expensesByCategory, null, null);
+    }
 }

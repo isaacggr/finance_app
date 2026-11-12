@@ -145,6 +145,10 @@ public class Goal {
                 : GoalStatus.IN_PROGRESS;
     }
 
+    public boolean isCompleted() {
+        return getStatus() == GoalStatus.COMPLETED;
+    }
+
     private static String normalizeRequiredTitle(String title) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("O título da meta é obrigatório");

@@ -2,6 +2,8 @@ package com.isaacggr.finance_app.repository;
 
 import com.isaacggr.finance_app.domain.entity.Budget;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,4 +33,14 @@ public interface BudgetRepository extends JpaRepository<Budget, UUID> {
             int year,
             UUID id
     );
+
+    Optional<Budget> findByUserIdAndCategoryAndMonthAndYear(
+            UUID userId,
+            String category,
+            int month,
+            int year
+    );
+
+    @Query("SELECT DISTINCT b.category FROM Budget b WHERE b.user.id = :userId ORDER BY b.category ASC")
+    List<String> findDistinctCategoriesByUserId(@Param("userId") UUID userId);
 }

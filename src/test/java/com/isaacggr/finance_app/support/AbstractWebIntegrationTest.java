@@ -5,7 +5,9 @@ import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.GoalContributionRepository;
 import com.isaacggr.finance_app.repository.GoalRepository;
+import com.isaacggr.finance_app.repository.NotificationRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;
+import com.isaacggr.finance_app.repository.UserNotificationPreferenceRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import com.isaacggr.finance_app.repository.VerificationTokenRepository;
 import com.isaacggr.finance_app.service.TokenService;
@@ -63,6 +65,12 @@ public abstract class AbstractWebIntegrationTest {
 
     @MockitoBean
     protected BillRepository billRepository;
+
+    @MockitoBean
+    protected UserNotificationPreferenceRepository userNotificationPreferenceRepository;
+
+    @MockitoBean
+    protected NotificationRepository notificationRepository;
 
     @MockitoBean
     protected VerificationTokenRepository verificationTokenRepository;

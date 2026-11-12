@@ -2,6 +2,7 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.domain.enums.BillStatus;
 import com.isaacggr.finance_app.repository.BillRepository;
@@ -43,6 +44,12 @@ class BillAlertServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private NotificationPreferenceService preferenceService;
+
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private BillAlertService billAlertService;
 
@@ -72,6 +79,9 @@ class BillAlertServiceTest {
                 today.plusDays(3),
                 BillRecurrence.MONTHLY
         );
+
+        lenient().when(preferenceService.getEntityOrDefault(any()))
+                .thenAnswer(inv -> UserNotificationPreference.defaultFor(inv.getArgument(0)));
     }
 
     @Test
@@ -159,5 +169,33 @@ class BillAlertServiceTest {
         verify(billRepository, times(3))
                 .findOpenBillsUpTo(user1.getId(), today.plusDays(BillAlertService.DEFAULT_DAYS_AHEAD));
         verify(emailService, never()).sendBillAlertEmail(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("Deve respeitar preferência do usuário no CRON (e-mail desabilitado, dias customizados e sino habilitado)")
+    void processDailyBillAlerts_RespectsUserPreferencesAndInAppAlerts() {
+        UserNotificationPreference customPrefs = new UserNotificationPreference(
+                user1, false, true, 5, true, true, true, true
+        );
+        when(preferenceService.getEntityOrDefault(user1)).thenReturn(customPrefs);
+
+        Bill dueIn5Days = new Bill(user1, "Condomínio", null, "MORADIA", new BigDecimal("450.00"), today.plusDays(5), BillRecurrence.MONTHLY);
+        ReflectionTestUtils.setField(dueIn5Days, "id", UUID.randomUUID());
+
+        Bill overdue = new Bill(user1, "Água", null, "MORADIA", new BigDecimal("85.00"), today.minusDays(1), BillRecurrence.MONTHLY);
+        ReflectionTestUtils.setField(overdue, "id", UUID.randomUUID());
+
+        when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1));
+        when(billRepository.findByUserIdAndStatusAndDueDateInOrderByDueDateAscCreatedAtDesc(
+                eq(user1.getId()), eq(BillStatus.PENDING), eq(List.of(today, today.plusDays(5)))))
+                .thenReturn(List.of(dueIn5Days));
+        when(billRepository.findOverdueByUserId(user1.getId(), today))
+                .thenReturn(List.of(overdue));
+
+        billAlertService.processDailyBillAlerts();
+
+        verify(emailService, never()).sendBillAlertEmail(any(), any(), any(), anyInt());
+        verify(notificationService).notifyBillDueAlert(user1, dueIn5Days, 5L);
+        verify(notificationService).notifyBillDueAlert(user1, overdue, -1L);
     }
 }

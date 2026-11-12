@@ -1,6 +1,8 @@
 package com.isaacggr.finance_app.service;
 
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
@@ -38,6 +40,12 @@ class MonthlyReportServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private NotificationPreferenceService preferenceService;
+
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private MonthlyReportService monthlyReportService;
 
@@ -56,13 +64,16 @@ class MonthlyReportServiceTest {
         user2.verifyEmail();
 
         sampleSummary = new DashboardSummaryDTO(
-                LocalDate.now().minusMonths(1).withDayOfMonth(1),
-                LocalDate.now().minusMonths(1).withDayOfMonth(28),
+                LocalDate.now(Bill.DEFAULT_ZONE).minusMonths(1).withDayOfMonth(1),
+                LocalDate.now(Bill.DEFAULT_ZONE).minusMonths(1).withDayOfMonth(28),
                 new BigDecimal("5000.00"),
                 new BigDecimal("2000.00"),
                 new BigDecimal("3000.00"),
                 List.of(new CategoryExpenseDTO("ALIMENTACAO", new BigDecimal("800.00")))
         );
+
+        lenient().when(preferenceService.getEntityOrDefault(any()))
+                .thenAnswer(inv -> UserNotificationPreference.defaultFor(inv.getArgument(0)));
     }
 
     @Test
@@ -93,7 +104,7 @@ class MonthlyReportServiceTest {
     @Test
     @DisplayName("Deve enviar relatório sob demanda para o mês anterior quando parâmetros forem nulos")
     void sendReportForUser_Success_DefaultPreviousMonth() {
-        YearMonth lastMonth = YearMonth.now().minusMonths(1);
+        YearMonth lastMonth = YearMonth.now(Bill.DEFAULT_ZONE).minusMonths(1);
         String expectedPeriod = String.format("%02d/%d", lastMonth.getMonthValue(), lastMonth.getYear());
 
         when(dashboardService.getSummary(user1.getId(), lastMonth.atDay(1), lastMonth.atEndOfMonth()))
@@ -143,5 +154,21 @@ class MonthlyReportServiceTest {
         assertEquals("O mês informado deve estar entre 1 e 12", exception2.getMessage());
 
         verify(emailService, never()).sendMonthlyReportEmail(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Deve respeitar preferência do usuário no CRON mensal (sem e-mail, apenas notificação no sino)")
+    void processMonthlyReports_RespectsPreferences() {
+        UserNotificationPreference inAppOnly = new UserNotificationPreference(
+                user1, true, true, 3, false, true, true, true
+        );
+        when(preferenceService.getEntityOrDefault(user1)).thenReturn(inAppOnly);
+        when(userRepository.findByEmailVerifiedTrueAndDeletedFalse()).thenReturn(List.of(user1));
+        when(dashboardService.getSummary(eq(user1.getId()), any(), any())).thenReturn(sampleSummary);
+
+        monthlyReportService.processMonthlyReports();
+
+        verify(emailService, never()).sendMonthlyReportEmail(eq("isaac@example.com"), any(), any(), any());
+        verify(notificationService).notifyMonthlyReportReady(eq(user1), any(), eq(sampleSummary.balance()));
     }
 }

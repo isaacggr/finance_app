@@ -25,10 +25,16 @@ public class GoalService {
 
     private final GoalRepository goalRepository;
     private final GoalContributionRepository goalContributionRepository;
+    private final NotificationService notificationService;
 
-    public GoalService(GoalRepository goalRepository, GoalContributionRepository goalContributionRepository) {
+    public GoalService(
+            GoalRepository goalRepository,
+            GoalContributionRepository goalContributionRepository,
+            NotificationService notificationService
+    ) {
         this.goalRepository = goalRepository;
         this.goalContributionRepository = goalContributionRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -63,6 +69,10 @@ public class GoalService {
             savedGoal = goalRepository.save(savedGoal);
         }
 
+        if (savedGoal.isCompleted()) {
+            notificationService.notifyGoalCompleted(savedGoal.getUser(), savedGoal);
+        }
+
         return GoalResponseDTO.fromEntity(savedGoal);
     }
 
@@ -94,7 +104,11 @@ public class GoalService {
         }
 
         goal.update(dto.title(), dto.description(), dto.targetAmount(), dto.deadline(), targetPrimary);
-        return GoalResponseDTO.fromEntity(goalRepository.save(goal));
+        Goal saved = goalRepository.save(goal);
+        if (saved.isCompleted()) {
+            notificationService.notifyGoalCompleted(saved.getUser(), saved);
+        }
+        return GoalResponseDTO.fromEntity(saved);
     }
 
     public GoalResponseDTO setAsPrimary(UUID goalId, UUID userId) {
@@ -136,6 +150,10 @@ public class GoalService {
 
         GoalContribution savedContribution = goalContributionRepository.save(contribution);
         Goal savedGoal = goalRepository.save(goal);
+
+        if (savedGoal.isCompleted()) {
+            notificationService.notifyGoalCompleted(savedGoal.getUser(), savedGoal);
+        }
 
         return GoalContributionResponseDTO.fromEntityWithGoal(savedContribution, savedGoal);
     }

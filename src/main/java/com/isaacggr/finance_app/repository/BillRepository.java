@@ -59,4 +59,7 @@ public interface BillRepository extends JpaRepository<Bill, UUID> {
             BillStatus status,
             Collection<LocalDate> dueDates
     );
+
+    @Query("SELECT DISTINCT b.category FROM Bill b WHERE b.user.id = :userId ORDER BY b.category ASC")
+    List<String> findDistinctCategoriesByUserId(@Param("userId") UUID userId);
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.entity.VerificationToken;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
 import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
@@ -20,6 +21,7 @@ import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
+import com.isaacggr.finance_app.repository.UserNotificationPreferenceRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 
 @Service
@@ -29,17 +31,20 @@ public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
+    private final UserNotificationPreferenceRepository preferenceRepository;
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService verificationTokenService;
     private final EmailService emailService;
 
     public UserService(
             UserRepository userRepository,
+            UserNotificationPreferenceRepository preferenceRepository,
             PasswordEncoder passwordEncoder,
             VerificationTokenService verificationTokenService,
             EmailService emailService
     ) {
         this.userRepository = userRepository;
+        this.preferenceRepository = preferenceRepository;
         this.passwordEncoder = passwordEncoder;
         this.verificationTokenService = verificationTokenService;
         this.emailService = emailService;
@@ -67,6 +72,7 @@ public class UserService {
         );
 
         User savedUser = userRepository.save(user);
+        preferenceRepository.save(UserNotificationPreference.defaultFor(savedUser));
 
         // Gera token temporário de ativação (24h) e dispara e-mail de confirmação
         VerificationToken token = verificationTokenService.createEmailVerificationToken(savedUser);

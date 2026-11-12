@@ -10,6 +10,7 @@ import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
+import com.isaacggr.finance_app.repository.UserNotificationPreferenceRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserNotificationPreferenceRepository preferenceRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -72,6 +76,7 @@ class UserServiceTest {
         assertEquals(dto.name(), response.name());
         assertEquals(dto.email(), response.email());
         verify(userRepository, times(1)).save(any(User.class));
+        verify(preferenceRepository, times(1)).save(any());
         verify(verificationTokenService, times(1)).createEmailVerificationToken(sampleUser);
         verify(emailService, times(1)).sendVerificationEmail(eq("isaac@example.com"), eq("Isaac Gregorio"), anyString());
     }

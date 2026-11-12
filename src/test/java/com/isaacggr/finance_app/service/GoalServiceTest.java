@@ -41,6 +41,9 @@ class GoalServiceTest {
     @Mock
     private GoalContributionRepository goalContributionRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private GoalService goalService;
 
@@ -296,5 +299,21 @@ class GoalServiceTest {
         verify(goalRepository).delete(sampleGoal);
         assertTrue(fallbackGoal.isPrimary());
         verify(goalRepository).save(fallbackGoal);
+    }
+
+    @Test
+    @DisplayName("Deve notificar meta concluída quando aporte atingir 100% do objetivo")
+    void addContribution_NotifiesWhenGoalCompleted() {
+        sampleGoal.applyContribution(new BigDecimal("3500.00"));
+        when(goalRepository.findByIdAndUserId(goalId, userId)).thenReturn(Optional.of(sampleGoal));
+        when(goalContributionRepository.save(any(GoalContribution.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        GoalContributionResponseDTO response = goalService.addContribution(
+                goalId, userId, new GoalContributionCreateDTO(new BigDecimal("500.00"), LocalDate.now(), "Meta batida")
+        );
+
+        assertEquals(GoalStatus.COMPLETED, response.goal().status());
+        verify(notificationService).notifyGoalCompleted(sampleUser, sampleGoal);
     }
 }

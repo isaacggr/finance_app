@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -113,6 +114,6 @@ public class Transaction {
         if (category == null || category.isBlank()) {
             return "OUTROS";
         }
-        return category.trim().toUpperCase();
+        return category.trim().toUpperCase(Locale.of("pt", "BR"));
     }
 }

@@ -1,11 +1,14 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.dto.NotificationPreferenceResponseDTO;
+import com.isaacggr.finance_app.dto.NotificationPreferenceUpdateDTO;
 import com.isaacggr.finance_app.dto.UserCreateDTO;
 import com.isaacggr.finance_app.dto.UserPasswordUpdateDTO;
 import com.isaacggr.finance_app.dto.UserProfileUpdateDTO;
 import com.isaacggr.finance_app.dto.UserResponseDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
+import com.isaacggr.finance_app.service.NotificationPreferenceService;
 import com.isaacggr.finance_app.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,9 +30,11 @@ import java.util.Map;
 public class UserController {
 
     private final UserService service;
+    private final NotificationPreferenceService preferenceService;
 
-    public UserController(UserService service) {
+    public UserController(UserService service, NotificationPreferenceService preferenceService) {
         this.service = service;
+        this.preferenceService = preferenceService;
     }
 
     // ✅ Criar usuário (Rota pública de cadastro)
@@ -87,6 +92,35 @@ public class UserController {
     ) {
         service.changePassword(user.getId(), dto);
         return ResponseEntity.ok(Map.of("message", "Senha alterada com sucesso."));
+    }
+
+    @GetMapping("/me/notification-preferences")
+    @Operation(
+            summary = "Obter preferências de notificação",
+            description = "Retorna as preferências de alertas por e-mail e notificações no aplicativo do usuário autenticado"
+    )
+    @ApiResponse(responseCode = "200", description = "Preferências retornadas com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<NotificationPreferenceResponseDTO> getNotificationPreferences(
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(preferenceService.getPreferences(user.getId()));
+    }
+
+    @PutMapping("/me/notification-preferences")
+    @Operation(
+            summary = "Atualizar preferências de notificação",
+            description = "Atualiza as preferências de alertas de contas, relatórios mensais, orçamentos e metas do usuário autenticado"
+    )
+    @ApiResponse(responseCode = "200", description = "Preferências atualizadas com sucesso")
+    @ApiResponse(responseCode = "404", description = "Usuário não encontrado",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<NotificationPreferenceResponseDTO> updateNotificationPreferences(
+            @RequestBody @Valid NotificationPreferenceUpdateDTO dto,
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(preferenceService.updatePreferences(user.getId(), dto));
     }
 
     // ✅ Excluir própria conta (Zero IDOR)

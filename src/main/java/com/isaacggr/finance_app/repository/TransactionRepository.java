@@ -3,6 +3,7 @@ package com.isaacggr.finance_app.repository;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.CategoryExpenseDTO;
+import com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -56,5 +57,46 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             @Param("type") TransactionType type,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(t.amount), 0)
+        FROM Transaction t
+        WHERE t.user.id = :userId
+          AND t.type = :type
+          AND t.category = :category
+          AND t.date >= :startDate
+          AND t.date <= :endDate
+    """)
+    BigDecimal sumAmountByTypeAndCategoryAndPeriod(
+            @Param("userId") UUID userId,
+            @Param("type") TransactionType type,
+            @Param("category") String category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT new com.isaacggr.finance_app.dto.DailyTransactionAggregateDTO(t.date, t.type, SUM(t.amount))
+        FROM Transaction t
+        WHERE t.user.id = :userId
+          AND t.date >= :startDate
+          AND t.date <= :endDate
+        GROUP BY t.date, t.type
+        ORDER BY t.date ASC
+    """)
+    List<DailyTransactionAggregateDTO> aggregateByDateAndType(
+            @Param("userId") UUID userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("SELECT DISTINCT t.category FROM Transaction t WHERE t.user.id = :userId ORDER BY t.category ASC")
+    List<String> findDistinctCategoriesByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT DISTINCT t.category FROM Transaction t WHERE t.user.id = :userId AND t.type = :type ORDER BY t.category ASC")
+    List<String> findDistinctCategoriesByUserIdAndType(
+            @Param("userId") UUID userId,
+            @Param("type") TransactionType type
     );
 }

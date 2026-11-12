@@ -31,10 +31,16 @@ public class BudgetService {
 
     private final BudgetRepository budgetRepository;
     private final TransactionRepository transactionRepository;
+    private final BudgetAlertEvaluator budgetAlertEvaluator;
 
-    public BudgetService(BudgetRepository budgetRepository, TransactionRepository transactionRepository) {
+    public BudgetService(
+            BudgetRepository budgetRepository,
+            TransactionRepository transactionRepository,
+            BudgetAlertEvaluator budgetAlertEvaluator
+    ) {
         this.budgetRepository = budgetRepository;
         this.transactionRepository = transactionRepository;
+        this.budgetAlertEvaluator = budgetAlertEvaluator;
     }
 
     // ==========================================
@@ -62,7 +68,9 @@ public class BudgetService {
                 dto.year()
         );
 
-        return BudgetResponseDTO.fromEntity(budgetRepository.save(budget));
+        Budget saved = budgetRepository.save(budget);
+        budgetAlertEvaluator.evaluateBudget(saved.getUser(), saved);
+        return BudgetResponseDTO.fromEntity(saved);
     }
 
     // ==========================================
@@ -163,7 +171,9 @@ public class BudgetService {
         }
 
         budget.update(targetCategory, dto.amount(), targetMonth, targetYear);
-        return BudgetResponseDTO.fromEntity(budgetRepository.save(budget));
+        Budget saved = budgetRepository.save(budget);
+        budgetAlertEvaluator.evaluateBudget(saved.getUser(), saved);
+        return BudgetResponseDTO.fromEntity(saved);
     }
 
     // ==========================================

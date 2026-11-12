@@ -3,6 +3,7 @@ package com.isaacggr.finance_app.service;
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.domain.enums.BillStatus;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
@@ -43,6 +44,12 @@ class BillServiceTest {
     @Mock
     private TransactionService transactionService;
 
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private NotificationPreferenceService preferenceService;
+
     @InjectMocks
     private BillService billService;
 
@@ -60,6 +67,9 @@ class BillServiceTest {
         sampleUser = new User("Isaac Gregorio", "isaac@example.com", "hash123");
         ReflectionTestUtils.setField(sampleUser, "id", userId);
         sampleUser.verifyEmail();
+
+        lenient().when(preferenceService.getEntityOrDefault(any()))
+                .thenAnswer(inv -> UserNotificationPreference.defaultFor(inv.getArgument(0)));
     }
 
     @Test
@@ -279,5 +289,21 @@ class BillServiceTest {
         UUID otherBillId = UUID.randomUUID();
         when(billRepository.findByIdAndUserId(otherBillId, userId)).thenReturn(Optional.empty());
         assertThrows(NotFoundException.class, () -> billService.delete(otherBillId, userId));
+    }
+
+    @Test
+    @DisplayName("Deve gerar notificação in-app imediata quando nova conta já estiver dentro da janela de alerta")
+    void create_DueToday_TriggersInAppNotification() {
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> {
+            Bill saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", billId);
+            return saved;
+        });
+
+        billService.create(sampleUser, new BillCreateDTO(
+                "Aluguel", null, "MORADIA", new BigDecimal("1800.00"), today, BillRecurrence.MONTHLY
+        ));
+
+        verify(notificationService).notifyBillDueAlert(eq(sampleUser), any(Bill.class), eq(0L));
     }
 }

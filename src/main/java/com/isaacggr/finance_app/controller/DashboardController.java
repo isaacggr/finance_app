@@ -1,7 +1,9 @@
 package com.isaacggr.finance_app.controller;
 
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.enums.TimeSeriesGranularity;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
+import com.isaacggr.finance_app.dto.DashboardTimeseriesDTO;
 import com.isaacggr.finance_app.exception.ErrorResponse;
 import com.isaacggr.finance_app.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +33,10 @@ public class DashboardController {
     }
 
     @GetMapping("/summary")
-    @Operation(summary = "Obter resumo financeiro", description = "Retorna métricas consolidadas (total de receitas, despesas, saldo e detalhamento por categoria) para um intervalo de datas ou mês corrente")
+    @Operation(
+            summary = "Obter resumo financeiro",
+            description = "Retorna métricas consolidadas (receitas, despesas, saldo, detalhamento por categoria) com comparação do período anterior (previous) e variações (variation)"
+    )
     @ApiResponse(responseCode = "200", description = "Resumo financeiro retornado com sucesso")
     @ApiResponse(responseCode = "409", description = "Intervalo de datas inválido (startDate posterior a endDate)",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
@@ -42,5 +47,22 @@ public class DashboardController {
     ) {
         DashboardSummaryDTO summary = dashboardService.getSummary(user.getId(), startDate, endDate);
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/timeseries")
+    @Operation(
+            summary = "Obter série temporal financeira",
+            description = "Retorna pontos contínuos (com zero-filling) de receitas, despesas, saldo do bucket e saldo acumulado para sparklines e gráficos temporais"
+    )
+    @ApiResponse(responseCode = "200", description = "Série temporal retornada com sucesso")
+    @ApiResponse(responseCode = "409", description = "Intervalo de datas inválido (startDate posterior a endDate)",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<DashboardTimeseriesDTO> getTimeseries(
+            @RequestParam(required = false) @Parameter(description = "Data inicial do período (AAAA-MM-DD)", example = "2026-11-01") LocalDate startDate,
+            @RequestParam(required = false) @Parameter(description = "Data final do período (AAAA-MM-DD)", example = "2026-11-30") LocalDate endDate,
+            @RequestParam(required = false) @Parameter(description = "Granularidade desejada (DAILY ou MONTHLY). Quando omitida, escolhe automaticamente conforme a largura do intervalo.", example = "DAILY") TimeSeriesGranularity granularity,
+            @AuthenticationPrincipal User user
+    ) {
+        return ResponseEntity.ok(dashboardService.getTimeseries(user.getId(), startDate, endDate, granularity));
     }
 }

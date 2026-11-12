@@ -29,10 +29,19 @@ public class BillService {
 
     private final BillRepository billRepository;
     private final TransactionService transactionService;
+    private final NotificationService notificationService;
+    private final NotificationPreferenceService preferenceService;
 
-    public BillService(BillRepository billRepository, TransactionService transactionService) {
+    public BillService(
+            BillRepository billRepository,
+            TransactionService transactionService,
+            NotificationService notificationService,
+            NotificationPreferenceService preferenceService
+    ) {
         this.billRepository = billRepository;
         this.transactionService = transactionService;
+        this.notificationService = notificationService;
+        this.preferenceService = preferenceService;
     }
 
     public BillResponseDTO create(User user, BillCreateDTO dto) {
@@ -50,7 +59,9 @@ public class BillService {
                 dto.recurrence()
         );
 
-        return BillResponseDTO.fromEntity(billRepository.save(bill));
+        Bill saved = billRepository.save(bill);
+        notifyIfDueWithinWindow(user, saved);
+        return BillResponseDTO.fromEntity(saved);
     }
 
     @Transactional(readOnly = true)
@@ -104,7 +115,9 @@ public class BillService {
                 dto.recurrence()
         );
 
-        return BillResponseDTO.fromEntity(billRepository.save(bill));
+        Bill saved = billRepository.save(bill);
+        notifyIfDueWithinWindow(saved.getUser(), saved);
+        return BillResponseDTO.fromEntity(saved);
     }
 
     /**
@@ -164,6 +177,17 @@ public class BillService {
     private Bill findOwnedBill(UUID billId, UUID userId) {
         return billRepository.findByIdAndUserId(billId, userId)
                 .orElseThrow(() -> new NotFoundException("Conta a pagar não encontrada"));
+    }
+
+    private void notifyIfDueWithinWindow(User user, Bill bill) {
+        if (bill.isPaid() || user == null) {
+            return;
+        }
+        int alertDays = preferenceService.getEntityOrDefault(user).getBillAlertDaysBefore();
+        long dueInDays = bill.getDueInDaysOn(LocalDate.now(Bill.DEFAULT_ZONE));
+        if (dueInDays <= alertDays) {
+            notificationService.notifyBillDueAlert(user, bill, dueInDays);
+        }
     }
 
     private static int normalizeUpcomingDays(Integer days) {

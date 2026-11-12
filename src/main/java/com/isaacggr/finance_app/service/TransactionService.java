@@ -26,9 +26,14 @@ import java.util.UUID;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final BudgetAlertEvaluator budgetAlertEvaluator;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    public TransactionService(
+            TransactionRepository transactionRepository,
+            BudgetAlertEvaluator budgetAlertEvaluator
+    ) {
         this.transactionRepository = transactionRepository;
+        this.budgetAlertEvaluator = budgetAlertEvaluator;
     }
 
     // ======================
@@ -63,7 +68,11 @@ public class TransactionService {
                 description
         );
 
-        return transactionRepository.save(transaction);
+        Transaction saved = transactionRepository.save(transaction);
+        if (saved.getType() == TransactionType.EXPENSE) {
+            budgetAlertEvaluator.evaluateFor(saved.getUser(), saved.getCategory(), saved.getDate());
+        }
+        return saved;
     }
 
     // ======================
@@ -157,6 +166,9 @@ public class TransactionService {
         }
 
         transaction.update(amount, type, category, date, description);
+        if (transaction.getType() == TransactionType.EXPENSE) {
+            budgetAlertEvaluator.evaluateFor(transaction.getUser(), transaction.getCategory(), transaction.getDate());
+        }
         return transaction;
     }
 

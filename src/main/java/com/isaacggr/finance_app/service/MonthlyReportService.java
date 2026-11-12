@@ -1,6 +1,8 @@
 package com.isaacggr.finance_app.service;
 
+import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.User;
+import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
 import com.isaacggr.finance_app.dto.DashboardSummaryDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.repository.UserRepository;
@@ -22,25 +24,31 @@ public class MonthlyReportService {
     private final UserRepository userRepository;
     private final DashboardService dashboardService;
     private final EmailService emailService;
+    private final NotificationPreferenceService preferenceService;
+    private final NotificationService notificationService;
 
     public MonthlyReportService(
             UserRepository userRepository,
             DashboardService dashboardService,
-            EmailService emailService
+            EmailService emailService,
+            NotificationPreferenceService preferenceService,
+            NotificationService notificationService
     ) {
         this.userRepository = userRepository;
         this.dashboardService = dashboardService;
         this.emailService = emailService;
+        this.preferenceService = preferenceService;
+        this.notificationService = notificationService;
     }
 
     // ==========================================
     // DISPARO AGENDADO AUTOMATIZADO
-    // Executa no dia 1º de cada mês às 08:00
+    // Executa no dia 1º de cada mês às 08:00 America/Sao_Paulo
     // ==========================================
-    @Scheduled(cron = "${app.reports.monthly.cron:0 0 8 1 * ?}")
-    @Transactional(readOnly = true)
+    @Scheduled(cron = "${app.reports.monthly.cron:0 0 8 1 * ?}", zone = "America/Sao_Paulo")
+    @Transactional
     public void processMonthlyReports() {
-        YearMonth previousMonth = YearMonth.now().minusMonths(1);
+        YearMonth previousMonth = YearMonth.now(Bill.DEFAULT_ZONE).minusMonths(1);
         LocalDate startDate = previousMonth.atDay(1);
         LocalDate endDate = previousMonth.atEndOfMonth();
         String periodName = String.format("%02d/%d", previousMonth.getMonthValue(), previousMonth.getYear());
@@ -52,9 +60,19 @@ public class MonthlyReportService {
 
         for (User user : eligibleUsers) {
             try {
+                UserNotificationPreference prefs = preferenceService.getEntityOrDefault(user);
+                if (!prefs.isMonthlyReportEmailEnabled() && !prefs.isMonthlyReportInAppEnabled()) {
+                    continue;
+                }
+
                 DashboardSummaryDTO summary = dashboardService.getSummary(user.getId(), startDate, endDate);
-                emailService.sendMonthlyReportEmail(user.getEmail(), user.getName(), summary, periodName);
-                totalSent++;
+                if (prefs.isMonthlyReportEmailEnabled()) {
+                    emailService.sendMonthlyReportEmail(user.getEmail(), user.getName(), summary, periodName);
+                    totalSent++;
+                }
+                if (prefs.isMonthlyReportInAppEnabled()) {
+                    notificationService.notifyMonthlyReportReady(user, periodName, summary.balance());
+                }
             } catch (Exception ex) {
                 log.error("Erro ao gerar relatório mensal para o usuário {}: {}", user.getEmail(), ex.getMessage());
             }
@@ -66,7 +84,7 @@ public class MonthlyReportService {
     // ==========================================
     // DISPARO SOB DEMANDA (Para testes / usuário autenticado)
     // ==========================================
-    @Transactional(readOnly = true)
+    @Transactional
     public void sendReportForUser(User user, Integer month, Integer year) {
         YearMonth targetMonth;
 
@@ -74,11 +92,11 @@ public class MonthlyReportService {
             if (month < 1 || month > 12) {
                 throw new BusinessException("O mês informado deve estar entre 1 e 12");
             }
-            int effectiveYear = (year != null) ? year : LocalDate.now().getYear();
+            int effectiveYear = (year != null) ? year : LocalDate.now(Bill.DEFAULT_ZONE).getYear();
             targetMonth = YearMonth.of(effectiveYear, month);
         } else {
             // Se nenhum período for passado, assume o mês anterior fechado
-            targetMonth = YearMonth.now().minusMonths(1);
+            targetMonth = YearMonth.now(Bill.DEFAULT_ZONE).minusMonths(1);
         }
 
         LocalDate startDate = targetMonth.atDay(1);
@@ -87,6 +105,7 @@ public class MonthlyReportService {
 
         DashboardSummaryDTO summary = dashboardService.getSummary(user.getId(), startDate, endDate);
         emailService.sendMonthlyReportEmail(user.getEmail(), user.getName(), summary, periodName);
+        notificationService.notifyMonthlyReportReady(user, periodName, summary.balance());
     }
 }
 
