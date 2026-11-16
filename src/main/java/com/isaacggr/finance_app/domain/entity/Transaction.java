@@ -1,7 +1,6 @@
 package com.isaacggr.finance_app.domain.entity;
 
 import com.isaacggr.finance_app.domain.enums.TransactionType;
-
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,7 +15,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "transactions", indexes = {
-        @Index(name = "idx_transactions_user_date", columnList = "user_id, date")
+        @Index(name = "idx_transactions_user_date", columnList = "user_id, date"),
+        @Index(name = "idx_transactions_installment_group", columnList = "installment_group_id")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -29,6 +29,16 @@ public class Transaction {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "installment_group_id")
+    private InstallmentGroup installmentGroup;
+
+    @Column(name = "installment_number")
+    private Integer installmentNumber;
+
+    @Column(name = "total_installments")
+    private Integer totalInstallments;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
@@ -53,7 +63,7 @@ public class Transaction {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     // =========================
-    // CONSTRUTOR
+    // CONSTRUTORES
     // =========================
     public Transaction(
             User user,
@@ -63,12 +73,29 @@ public class Transaction {
             LocalDate date,
             String description) {
 
+        this(user, amount, type, category, date, description, null, null, null);
+    }
+
+    public Transaction(
+            User user,
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            LocalDate date,
+            String description,
+            InstallmentGroup installmentGroup,
+            Integer installmentNumber,
+            Integer totalInstallments) {
+
         this.user = user;
         this.amount = normalizeMonetaryAmount(amount);
         this.type = type;
         this.category = normalizeCategory(category);
         this.date = date;
         this.description = description;
+        this.installmentGroup = installmentGroup;
+        this.installmentNumber = installmentNumber;
+        this.totalInstallments = totalInstallments;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -101,6 +128,21 @@ public class Transaction {
         this.category = normalizeCategory(category);
         this.date = date;
         this.description = description;
+    }
+
+    public UUID getInstallmentGroupId() {
+        return this.installmentGroup != null ? this.installmentGroup.getId() : null;
+    }
+
+    public Integer getTotalInstallments() {
+        if (this.totalInstallments != null) {
+            return this.totalInstallments;
+        }
+        return this.installmentGroup != null ? this.installmentGroup.getTotalInstallments() : null;
+    }
+
+    public boolean isInstallment() {
+        return this.installmentGroup != null;
     }
 
     public static BigDecimal normalizeMonetaryAmount(BigDecimal amount) {

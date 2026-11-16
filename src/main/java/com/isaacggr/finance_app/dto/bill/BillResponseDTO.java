@@ -44,6 +44,15 @@ public record BillResponseDTO(
         @Schema(description = "ID da transação de despesa gerada automaticamente no pagamento, se houver", example = "c31f7f64-2b43-4c11-941a-758420c45999")
         UUID paidTransactionId,
 
+        @Schema(description = "ID do grupo da compra parcelada, se esta conta for uma parcela", example = "550e8400-e29b-41d4-a716-446655440000")
+        UUID installmentGroupId,
+
+        @Schema(description = "Número da parcela atual (ex.: 1 para 1/10)", example = "1")
+        Integer installmentNumber,
+
+        @Schema(description = "Total de parcelas da compra (ex.: 10 para 1/10)", example = "10")
+        Integer totalInstallments,
+
         @Schema(description = "Data e hora de criação", example = "2026-11-11T20:50:00")
         LocalDateTime createdAt,
 
@@ -64,6 +73,9 @@ public record BillResponseDTO(
                 bill.getStatusOn(today),
                 bill.getPaidAt(),
                 bill.getPaidTransactionId(),
+                bill.getInstallmentGroup() != null ? bill.getInstallmentGroup().getId() : null,
+                bill.getInstallmentNumber(),
+                bill.getTotalInstallments(),
                 bill.getCreatedAt(),
                 bill.getUpdatedAt()
         );

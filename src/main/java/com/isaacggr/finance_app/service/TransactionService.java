@@ -1,5 +1,6 @@
 package com.isaacggr.finance_app.service;
 
+import com.isaacggr.finance_app.domain.entity.InstallmentGroup;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.enums.TransactionType;
@@ -47,6 +48,20 @@ public class TransactionService {
             LocalDate date,
             String description
     ) {
+        return create(user, amount, type, category, date, description, null, null, null);
+    }
+
+    public Transaction create(
+            User user,
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            LocalDate date,
+            String description,
+            InstallmentGroup installmentGroup,
+            Integer installmentNumber,
+            Integer totalInstallments
+    ) {
         if (user == null || !user.isActive()) {
             throw new NotFoundException("Usuário não encontrado");
         }
@@ -65,7 +80,10 @@ public class TransactionService {
                 type,
                 category,
                 date,
-                description
+                description,
+                installmentGroup,
+                installmentNumber,
+                totalInstallments
         );
 
         Transaction saved = transactionRepository.save(transaction);

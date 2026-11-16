@@ -44,6 +44,9 @@ class GoalServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private GamificationService gamificationService;
+
     @InjectMocks
     private GoalService goalService;
 

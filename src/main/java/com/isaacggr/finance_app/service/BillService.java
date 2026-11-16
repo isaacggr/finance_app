@@ -31,17 +31,20 @@ public class BillService {
     private final TransactionService transactionService;
     private final NotificationService notificationService;
     private final NotificationPreferenceService preferenceService;
+    private final GamificationService gamificationService;
 
     public BillService(
             BillRepository billRepository,
             TransactionService transactionService,
             NotificationService notificationService,
-            NotificationPreferenceService preferenceService
+            NotificationPreferenceService preferenceService,
+            GamificationService gamificationService
     ) {
         this.billRepository = billRepository;
         this.transactionService = transactionService;
         this.notificationService = notificationService;
         this.preferenceService = preferenceService;
+        this.gamificationService = gamificationService;
     }
 
     public BillResponseDTO create(User user, BillCreateDTO dto) {
@@ -149,13 +152,19 @@ public class BillService {
                     TransactionType.EXPENSE,
                     bill.getCategory(),
                     effectivePaidDate,
-                    buildGeneratedTransactionDescription(bill)
+                    buildGeneratedTransactionDescription(bill),
+                    bill.getInstallmentGroup(),
+                    bill.getInstallmentNumber(),
+                    bill.getTotalInstallments()
             );
             generatedTransactionId = generatedTx.getId();
         }
 
         bill.markAsPaid(effectivePaidDate, generatedTransactionId);
         Bill savedBill = billRepository.save(bill);
+
+        boolean onTime = !effectivePaidDate.isAfter(bill.getDueDate());
+        gamificationService.onBillPaid(user, onTime);
 
         BillResponseDTO nextBillDto = bill.createNextRecurringBill()
                 .map(billRepository::save)

@@ -4,6 +4,7 @@ import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.Budget;
 import com.isaacggr.finance_app.domain.entity.Goal;
 import com.isaacggr.finance_app.domain.entity.GoalContribution;
+import com.isaacggr.finance_app.domain.entity.InstallmentGroup;
 import com.isaacggr.finance_app.domain.entity.Notification;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
@@ -720,6 +721,77 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("Endpoints /installments devem criar, listar, buscar e excluir compra parcelada com Zero IDOR")
+    void installments_Crud_Success() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        when(installmentGroupRepository.save(any(InstallmentGroup.class))).thenAnswer(inv -> {
+            InstallmentGroup g = inv.getArgument(0);
+            ReflectionTestUtils.setField(g, "id", groupId);
+            return g;
+        });
+
+        when(billRepository.save(any(Bill.class))).thenAnswer(inv -> {
+            Bill b = inv.getArgument(0);
+            ReflectionTestUtils.setField(b, "id", UUID.randomUUID());
+            return b;
+        });
+
+        mockMvc.perform(post("/installments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "totalAmount": 1200.00,
+                                  "totalInstallments": 10,
+                                  "category": "eletronicos",
+                                  "startDate": "2026-11-15",
+                                  "description": "Notebook Dell"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(HttpHeaders.LOCATION, "http://localhost/installments/" + groupId))
+                .andExpect(jsonPath("$.id").value(groupId.toString()))
+                .andExpect(jsonPath("$.description").value("Notebook Dell"))
+                .andExpect(jsonPath("$.category").value("ELETRONICOS"))
+                .andExpect(jsonPath("$.totalAmount").value(1200.00))
+                .andExpect(jsonPath("$.totalInstallments").value(10))
+                .andExpect(jsonPath("$.installments.length()").value(10));
+
+        InstallmentGroup sampleGroup = new InstallmentGroup(
+                authenticatedUser,
+                "Notebook Dell",
+                new BigDecimal("1200.00"),
+                10,
+                "ELETRONICOS",
+                LocalDate.of(2026, 11, 15)
+        );
+        ReflectionTestUtils.setField(sampleGroup, "id", groupId);
+
+        when(installmentGroupRepository.findByUserId(eq(userId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleGroup)));
+
+        mockMvc.perform(get("/installments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(groupId.toString()));
+
+        when(installmentGroupRepository.findByIdAndUserId(groupId, userId))
+                .thenReturn(Optional.of(sampleGroup));
+
+        mockMvc.perform(get("/installments/" + groupId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(groupId.toString()));
+
+        mockMvc.perform(delete("/installments/" + groupId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt))
+                .andExpect(status().isNoContent());
+
+        verify(installmentGroupRepository).delete(sampleGroup);
+    }
+
+    @Test
     @DisplayName("OpenAPI /v3/api-docs deve achatar Pageable, expor PATCH /users/me e documentar respostas de erro")
     void openApiSpec_FlattensPageableAndDocumentsErrorsAndProfileEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
@@ -756,7 +828,37 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
                 .andExpect(jsonPath("$.paths['/bills/{billId}'].put.responses['409']").exists())
                 .andExpect(jsonPath("$.paths['/bills/{billId}/pay'].patch.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/bills/{billId}/pay'].patch.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/installments'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/installments'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/installments'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/installments'].post.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/installments'].get.parameters[?(@.name=='page')]").exists())
+                .andExpect(jsonPath("$.paths['/installments'].get.parameters[?(@.name=='pageable')]").isEmpty())
                 .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='page')]").exists())
-                .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='pageable')]").isEmpty());
+                .andExpect(jsonPath("$.paths['/transactions'].get.parameters[?(@.name=='pageable')]").isEmpty())
+                .andExpect(jsonPath("$.paths['/gamification/profile'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/gamification/checkin'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/quests'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/quests/{questId}/claim'].post.responses['200']").exists());
+    }
+
+    @Test
+    @DisplayName("Garante que os endpoints de gamificação e quests exigem autenticação (401)")
+    void shouldEnforceAuthenticationOnGamificationEndpoints() throws Exception {
+        mockMvc.perform(get("/gamification/profile"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, org.hamcrest.Matchers.startsWith("Bearer")));
+
+        mockMvc.perform(post("/gamification/checkin"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, org.hamcrest.Matchers.startsWith("Bearer")));
+
+        mockMvc.perform(get("/quests"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, org.hamcrest.Matchers.startsWith("Bearer")));
+
+        mockMvc.perform(post("/quests/" + UUID.randomUUID() + "/claim"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, org.hamcrest.Matchers.startsWith("Bearer")));
     }
 }

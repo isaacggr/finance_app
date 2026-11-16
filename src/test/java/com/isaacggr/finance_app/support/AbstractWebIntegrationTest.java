@@ -2,12 +2,15 @@ package com.isaacggr.finance_app.support;
 
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.repository.BillRepository;
+import com.isaacggr.finance_app.repository.InstallmentGroupRepository;
 import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.GoalContributionRepository;
 import com.isaacggr.finance_app.repository.GoalRepository;
 import com.isaacggr.finance_app.repository.NotificationRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.UserNotificationPreferenceRepository;
+import com.isaacggr.finance_app.repository.UserGameProfileRepository;
+import com.isaacggr.finance_app.repository.UserQuestRepository;
 import com.isaacggr.finance_app.repository.UserRepository;
 import com.isaacggr.finance_app.repository.VerificationTokenRepository;
 import com.isaacggr.finance_app.service.TokenService;
@@ -67,10 +70,19 @@ public abstract class AbstractWebIntegrationTest {
     protected BillRepository billRepository;
 
     @MockitoBean
+    protected InstallmentGroupRepository installmentGroupRepository;
+
+    @MockitoBean
     protected UserNotificationPreferenceRepository userNotificationPreferenceRepository;
 
     @MockitoBean
     protected NotificationRepository notificationRepository;
+
+    @MockitoBean
+    protected UserGameProfileRepository userGameProfileRepository;
+
+    @MockitoBean
+    protected UserQuestRepository userQuestRepository;
 
     @MockitoBean
     protected VerificationTokenRepository verificationTokenRepository;

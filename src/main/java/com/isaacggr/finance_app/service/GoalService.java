@@ -26,15 +26,18 @@ public class GoalService {
     private final GoalRepository goalRepository;
     private final GoalContributionRepository goalContributionRepository;
     private final NotificationService notificationService;
+    private final GamificationService gamificationService;
 
     public GoalService(
             GoalRepository goalRepository,
             GoalContributionRepository goalContributionRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            GamificationService gamificationService
     ) {
         this.goalRepository = goalRepository;
         this.goalContributionRepository = goalContributionRepository;
         this.notificationService = notificationService;
+        this.gamificationService = gamificationService;
     }
 
     /**
@@ -67,6 +70,7 @@ public class GoalService {
                     new GoalContribution(savedGoal, dto.initialAmount(), null, "Aporte inicial")
             );
             savedGoal = goalRepository.save(savedGoal);
+            gamificationService.onGoalContribution(savedGoal.getUser(), savedGoal.getCurrentAmount(), savedGoal.isCompleted());
         }
 
         if (savedGoal.isCompleted()) {
@@ -150,6 +154,8 @@ public class GoalService {
 
         GoalContribution savedContribution = goalContributionRepository.save(contribution);
         Goal savedGoal = goalRepository.save(goal);
+
+        gamificationService.onGoalContribution(savedGoal.getUser(), savedGoal.getCurrentAmount(), savedGoal.isCompleted());
 
         if (savedGoal.isCompleted()) {
             notificationService.notifyGoalCompleted(savedGoal.getUser(), savedGoal);

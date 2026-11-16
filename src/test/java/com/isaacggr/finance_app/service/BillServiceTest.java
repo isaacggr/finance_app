@@ -1,6 +1,7 @@
 package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Bill;
+import com.isaacggr.finance_app.domain.entity.InstallmentGroup;
 import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.entity.UserNotificationPreference;
@@ -49,6 +50,9 @@ class BillServiceTest {
 
     @Mock
     private NotificationPreferenceService preferenceService;
+
+    @Mock
+    private GamificationService gamificationService;
 
     @InjectMocks
     private BillService billService;
@@ -185,7 +189,10 @@ class BillServiceTest {
                 TransactionType.EXPENSE,
                 "CARTAO",
                 today,
-                "Pagamento: Cartão Nubank"
+                "Pagamento: Cartão Nubank",
+                null,
+                null,
+                null
         )).thenReturn(generatedTx);
         when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -196,6 +203,60 @@ class BillServiceTest {
         assertEquals(txId, response.bill().paidTransactionId());
         assertEquals(txId, response.generatedTransactionId());
         assertNull(response.nextBill());
+    }
+
+    @Test
+    @DisplayName("Deve repassar dados de parcelamento para a transação gerada ao pagar uma parcela de compra parcelada")
+    void pay_InstallmentBill_ForwardsInstallmentMetadataToTransaction() {
+        InstallmentGroup group = new InstallmentGroup(sampleUser, "Notebook", new BigDecimal("3000.00"), 10, "ELETRONICOS", today);
+        Bill installmentBill = new Bill(
+                sampleUser,
+                "Notebook (1/10)",
+                "Parcela 1 de 10",
+                "ELETRONICOS",
+                new BigDecimal("300.00"),
+                today,
+                BillRecurrence.ONCE,
+                group,
+                1,
+                10
+        );
+        ReflectionTestUtils.setField(installmentBill, "id", billId);
+
+        UUID txId = UUID.randomUUID();
+        Transaction generatedTx = new Transaction(
+                sampleUser,
+                new BigDecimal("300.00"),
+                TransactionType.EXPENSE,
+                "ELETRONICOS",
+                today,
+                "Pagamento: Notebook (1/10)",
+                group,
+                1,
+                10
+        );
+        ReflectionTestUtils.setField(generatedTx, "id", txId);
+
+        when(billRepository.findByIdAndUserId(billId, userId)).thenReturn(Optional.of(installmentBill));
+        when(transactionService.create(
+                sampleUser,
+                new BigDecimal("300.00"),
+                TransactionType.EXPENSE,
+                "ELETRONICOS",
+                today,
+                "Pagamento: Notebook (1/10)",
+                group,
+                1,
+                10
+        )).thenReturn(generatedTx);
+        when(billRepository.save(any(Bill.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BillPayResponseDTO response = billService.pay(billId, sampleUser, null);
+
+        assertEquals(BillStatus.PAID, response.bill().status());
+        assertEquals(txId, response.generatedTransactionId());
+        assertEquals(1, response.bill().installmentNumber());
+        assertEquals(10, response.bill().totalInstallments());
     }
 
     @Test

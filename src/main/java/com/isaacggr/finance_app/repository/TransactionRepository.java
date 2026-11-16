@@ -21,6 +21,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
     // 🔍 Buscar transação por ID e ID do Usuário (Prevenção de IDOR)
     Optional<Transaction> findByIdAndUserId(UUID id, UUID userId);
 
+    boolean existsByUserIdAndDateAndType(UUID userId, LocalDate date, TransactionType type);
+
     // 📄 Listar transações de um usuário (paginação simples legada)
     Page<Transaction> findByUserId(UUID userId, Pageable pageable);
 

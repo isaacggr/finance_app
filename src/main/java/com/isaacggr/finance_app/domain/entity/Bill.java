@@ -65,6 +65,16 @@ public class Bill {
     @Column(name = "paid_transaction_id")
     private UUID paidTransactionId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "installment_group_id")
+    private InstallmentGroup installmentGroup;
+
+    @Column(name = "installment_number")
+    private Integer installmentNumber;
+
+    @Column(name = "total_installments")
+    private Integer totalInstallments;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -90,6 +100,24 @@ public class Bill {
         this.status = BillStatus.PENDING;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public Bill(
+            User user,
+            String title,
+            String description,
+            String category,
+            BigDecimal amount,
+            LocalDate dueDate,
+            BillRecurrence recurrence,
+            InstallmentGroup installmentGroup,
+            Integer installmentNumber,
+            Integer totalInstallments
+    ) {
+        this(user, title, description, category, amount, dueDate, recurrence);
+        this.installmentGroup = installmentGroup;
+        this.installmentNumber = installmentNumber;
+        this.totalInstallments = totalInstallments;
     }
 
     @PrePersist

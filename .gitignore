@@ -48,3 +48,6 @@ application-dev.yaml
 
 # Configuração e diretrizes locais do assistente
 GEMINI.md
+
+# Binários e ferramentas locais
+cloudflared
