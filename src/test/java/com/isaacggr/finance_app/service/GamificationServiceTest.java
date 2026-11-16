@@ -6,10 +6,8 @@ import com.isaacggr.finance_app.domain.entity.UserQuest;
 import com.isaacggr.finance_app.domain.enums.QuestCategory;
 import com.isaacggr.finance_app.domain.enums.QuestStatus;
 import com.isaacggr.finance_app.dto.gamification.ClaimQuestResponseDTO;
-import com.isaacggr.finance_app.dto.gamification.GameProfileResponseDTO;
 import com.isaacggr.finance_app.exception.BusinessException;
 import com.isaacggr.finance_app.exception.NotFoundException;
-import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.UserGameProfileRepository;
 import com.isaacggr.finance_app.repository.UserQuestRepository;
@@ -42,9 +40,6 @@ class GamificationServiceTest {
 
     @Mock
     private TransactionRepository transactionRepository;
-
-    @Mock
-    private BudgetRepository budgetRepository;
 
     @InjectMocks
     private GamificationService gamificationService;

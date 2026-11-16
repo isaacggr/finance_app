@@ -1,9 +1,11 @@
 package com.isaacggr.finance_app.config;
 
+import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.support.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -184,7 +186,7 @@ class SecurityConfigTest extends AbstractWebIntegrationTest {
         User user = createVerifiedUser("Isaac", "isaac.ratelimit@example.com", "Senha123!");
         String jwt = tokenService.generateToken(user);
         when(userRepository.findByIdAndDeletedFalse(user.getId())).thenReturn(Optional.of(user));
-        when(transactionRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+        when(transactionRepository.findAll(ArgumentMatchers.<Specification<Transaction>>any(), any(Pageable.class))).thenReturn(Page.empty());
 
         mockMvc.perform(get("/transactions")
                         .with(req -> {

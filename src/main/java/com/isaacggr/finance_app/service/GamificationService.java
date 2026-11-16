@@ -9,7 +9,6 @@ import com.isaacggr.finance_app.dto.gamification.ClaimQuestResponseDTO;
 import com.isaacggr.finance_app.dto.gamification.GameProfileResponseDTO;
 import com.isaacggr.finance_app.dto.gamification.QuestResponseDTO;
 import com.isaacggr.finance_app.exception.NotFoundException;
-import com.isaacggr.finance_app.repository.BudgetRepository;
 import com.isaacggr.finance_app.repository.TransactionRepository;
 import com.isaacggr.finance_app.repository.UserGameProfileRepository;
 import com.isaacggr.finance_app.repository.UserQuestRepository;
@@ -41,7 +40,6 @@ public class GamificationService {
     private final UserGameProfileRepository gameProfileRepository;
     private final UserQuestRepository questRepository;
     private final TransactionRepository transactionRepository;
-    private final BudgetRepository budgetRepository;
 
     @Transactional
     public UserGameProfile getOrCreateProfile(User user) {
