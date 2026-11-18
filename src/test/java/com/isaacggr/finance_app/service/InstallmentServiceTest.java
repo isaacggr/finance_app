@@ -2,14 +2,17 @@ package com.isaacggr.finance_app.service;
 
 import com.isaacggr.finance_app.domain.entity.Bill;
 import com.isaacggr.finance_app.domain.entity.InstallmentGroup;
+import com.isaacggr.finance_app.domain.entity.Transaction;
 import com.isaacggr.finance_app.domain.entity.User;
 import com.isaacggr.finance_app.domain.enums.BillRecurrence;
 import com.isaacggr.finance_app.domain.enums.BillStatus;
+import com.isaacggr.finance_app.domain.enums.TransactionType;
 import com.isaacggr.finance_app.dto.installment.InstallmentPurchaseCreateDTO;
 import com.isaacggr.finance_app.exception.ConflictException;
 import com.isaacggr.finance_app.exception.NotFoundException;
 import com.isaacggr.finance_app.repository.BillRepository;
 import com.isaacggr.finance_app.repository.InstallmentGroupRepository;
+import com.isaacggr.finance_app.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,9 @@ class InstallmentServiceTest {
 
     @Mock
     private BillRepository billRepository;
+
+    @Mock
+    private TransactionRepository transactionRepository;
 
     @InjectMocks
     private InstallmentService installmentService;
@@ -75,7 +81,9 @@ class InstallmentServiceTest {
 
         InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
                 new BigDecimal("100.00"),
+                null,
                 3,
+                1,
                 "  eletronicos  ",
                 startDate,
                 "Fone Bluetooth"
@@ -122,6 +130,140 @@ class InstallmentServiceTest {
     }
 
     @Test
+    @DisplayName("Deve gerar transações e contas pagas para parcelas anteriores e pendentes a partir da atual")
+    void create_Success_WithCurrentInstallment_PastInstallmentsGoToTransactionsAndBillsMarkedPaid() {
+        when(installmentGroupRepository.save(any(InstallmentGroup.class))).thenAnswer(inv -> {
+            InstallmentGroup g = inv.getArgument(0);
+            ReflectionTestUtils.setField(g, "id", groupId);
+            return g;
+        });
+
+        when(billRepository.save(any(Bill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Usuário comprou algo em 5x de R$ 100 e está na parcela 3
+        InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
+                new BigDecimal("500.00"),
+                new BigDecimal("100.00"),
+                5,
+                3,
+                "CARTAO",
+                startDate,
+                "Notebook Usado"
+        );
+
+        InstallmentGroup result = installmentService.create(sampleUser, dto);
+
+        assertNotNull(result);
+        assertEquals(5, result.getTotalInstallments());
+
+        // 1. As 2 parcelas anteriores (1 e 2) devem ser salvas como Transações realizadas no passado
+        ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, times(2)).save(txCaptor.capture());
+        List<Transaction> savedTxs = txCaptor.getAllValues();
+
+        assertEquals(2, savedTxs.size());
+
+        // Parcela 1 paga 2 meses antes
+        assertEquals(new BigDecimal("100.00"), savedTxs.get(0).getAmount());
+        assertEquals(TransactionType.EXPENSE, savedTxs.get(0).getType());
+        assertEquals("Notebook Usado (1/5)", savedTxs.get(0).getDescription());
+        assertEquals(startDate.minusMonths(2), savedTxs.get(0).getDate());
+        assertEquals(1, savedTxs.get(0).getInstallmentNumber());
+        assertEquals(5, savedTxs.get(0).getTotalInstallments());
+
+        // Parcela 2 paga 1 mês antes
+        assertEquals(new BigDecimal("100.00"), savedTxs.get(1).getAmount());
+        assertEquals(TransactionType.EXPENSE, savedTxs.get(1).getType());
+        assertEquals("Notebook Usado (2/5)", savedTxs.get(1).getDescription());
+        assertEquals(startDate.minusMonths(1), savedTxs.get(1).getDate());
+        assertEquals(2, savedTxs.get(1).getInstallmentNumber());
+        assertEquals(5, savedTxs.get(1).getTotalInstallments());
+
+        // 2. No total são salvas 5 contas no banco (2 PAID e 3 PENDING)
+        ArgumentCaptor<Bill> captor = ArgumentCaptor.forClass(Bill.class);
+        verify(billRepository, times(5)).save(captor.capture());
+        List<Bill> savedBills = captor.getAllValues();
+
+        assertEquals(5, savedBills.size());
+
+        // Parcela 1: PAID, 2 meses antes
+        assertEquals(BillStatus.PAID, savedBills.get(0).getStatus());
+        assertEquals(startDate.minusMonths(2), savedBills.get(0).getDueDate());
+        assertEquals(1, savedBills.get(0).getInstallmentNumber());
+
+        // Parcela 2: PAID, 1 mês antes
+        assertEquals(BillStatus.PAID, savedBills.get(1).getStatus());
+        assertEquals(startDate.minusMonths(1), savedBills.get(1).getDueDate());
+        assertEquals(2, savedBills.get(1).getInstallmentNumber());
+
+        // Parcela 3: PENDING, startDate
+        assertEquals(BillStatus.PENDING, savedBills.get(2).getStatus());
+        assertEquals(startDate, savedBills.get(2).getDueDate());
+        assertEquals(3, savedBills.get(2).getInstallmentNumber());
+        assertEquals("Notebook Usado (3/5)", savedBills.get(2).getTitle());
+
+        // Parcela 4: PENDING, startDate + 1 mês
+        assertEquals(BillStatus.PENDING, savedBills.get(3).getStatus());
+        assertEquals(startDate.plusMonths(1), savedBills.get(3).getDueDate());
+        assertEquals(4, savedBills.get(3).getInstallmentNumber());
+
+        // Parcela 5: PENDING, startDate + 2 meses
+        assertEquals(BillStatus.PENDING, savedBills.get(4).getStatus());
+        assertEquals(startDate.plusMonths(2), savedBills.get(4).getDueDate());
+        assertEquals(5, savedBills.get(4).getInstallmentNumber());
+    }
+
+    @Test
+    @DisplayName("Deve calcular valor total automaticamente quando apenas installmentAmount for informado")
+    void create_Success_WithInstallmentAmountOnly_CalculatesTotal() {
+        when(installmentGroupRepository.save(any(InstallmentGroup.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(billRepository.save(any(Bill.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Informa apenas o valor da parcela (R$ 80,00 em 4x)
+        InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
+                null,
+                new BigDecimal("80.00"),
+                4,
+                1,
+                "LAZER",
+                startDate,
+                "Ingressos Show"
+        );
+
+        InstallmentGroup result = installmentService.create(sampleUser, dto);
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("320.00"), result.getTotalAmount());
+
+        ArgumentCaptor<Bill> captor = ArgumentCaptor.forClass(Bill.class);
+        verify(billRepository, times(4)).save(captor.capture());
+        List<Bill> savedBills = captor.getAllValues();
+
+        for (Bill b : savedBills) {
+            assertEquals(new BigDecimal("80.00"), b.getAmount());
+        }
+    }
+
+    @Test
+    @DisplayName("Deve lançar ConflictException se parcela atual for maior que o total de parcelas")
+    void create_CurrentInstallmentGreaterThanTotal_ThrowsConflictException() {
+        InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
+                new BigDecimal("500.00"),
+                null,
+                5,
+                6, // parcela 6 de 5 não existe
+                "GERAL",
+                startDate,
+                "Erro Parcela"
+        );
+
+        assertThrows(ConflictException.class, () -> installmentService.create(sampleUser, dto));
+        verifyNoInteractions(installmentGroupRepository);
+        verifyNoInteractions(billRepository);
+    }
+
+    @Test
     @DisplayName("Deve distribuir centavos de forma balanceada em divisões não exatas (ex: R$ 100 em 7x)")
     void create_Success_OddDivisionBalancesAcrossInstallments() {
         when(installmentGroupRepository.save(any(InstallmentGroup.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -129,7 +271,9 @@ class InstallmentServiceTest {
 
         InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
                 new BigDecimal("100.00"),
+                null,
                 7,
+                1,
                 "VIAGEM",
                 startDate,
                 "Passagem"
@@ -158,6 +302,8 @@ class InstallmentServiceTest {
     void create_InstallmentsLessThanTwo_ThrowsConflictException() {
         InstallmentPurchaseCreateDTO dto = new InstallmentPurchaseCreateDTO(
                 new BigDecimal("500.00"),
+                null,
+                1,
                 1,
                 "GERAL",
                 startDate,
@@ -174,7 +320,9 @@ class InstallmentServiceTest {
     void create_InvalidAmount_ThrowsConflictException() {
         InstallmentPurchaseCreateDTO dtoZero = new InstallmentPurchaseCreateDTO(
                 BigDecimal.ZERO,
+                null,
                 3,
+                1,
                 "GERAL",
                 startDate,
                 "Teste"
