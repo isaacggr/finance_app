@@ -1,7 +1,7 @@
 services:
-  finance-mysql:
+  goldforge-mysql:
     image: mysql:8.0
-    container_name: finance-mysql
+    container_name: goldforge-mysql
     restart: always
     env_file:
       - .env
@@ -13,7 +13,7 @@ services:
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
-      - finance_mysql_data:/var/lib/mysql
+      - goldforge_mysql_data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
@@ -22,23 +22,23 @@ services:
       retries: 10
       start_period: 15s
 
-  finance-app:
+  goldforge-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: finance-app
+    container_name: goldforge-api
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      DB_HOST: finance-mysql
+      DB_HOST: goldforge-mysql
       DB_PORT: 3306
     ports:
       - "8080:8080"
     depends_on:
-      finance-mysql:
+      goldforge-mysql:
         condition: service_healthy
 
 volumes:
-  finance_mysql_data:
+  goldforge_mysql_data:
     driver: local

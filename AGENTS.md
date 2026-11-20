@@ -1,4 +1,4 @@
-# Diretrizes de Desenvolvimento - Finance App
+# Diretrizes de Desenvolvimento - GoldForge (Finance App)
 
 Este arquivo fornece diretrizes e contexto básico para agentes de IA e desenvolvedores que colaboram no projeto.
 

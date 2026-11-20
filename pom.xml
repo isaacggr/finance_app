@@ -11,10 +11,10 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.isaacggr</groupId>
-	<artifactId>finance-app</artifactId>
+	<artifactId>goldforge</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>finace-app</name>
-	<description>Gerenciador de finanças pessoais</description>
+	<name>goldforge</name>
+	<description>GoldForge API - Gestão Financeira Pessoal com Gamificação RPG</description>
 	<url />
 	<licenses>
 		<license />

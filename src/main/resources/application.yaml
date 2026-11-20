@@ -8,7 +8,7 @@ server:
 
 spring:
   application:
-    name: finance-app
+    name: goldforge
 
   threads:
     virtual:
