@@ -126,7 +126,7 @@ public class EmailService {
         String htmlContent = """
                 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #ffffff;">
                     <div style="text-align: center; border-bottom: 2px solid #f5f5f5; padding-bottom: 16px; margin-bottom: 20px;">
-                        <h1 style="color: #1b5e20; margin: 0; font-size: 24px;">💰 Finance App</h1>
+                        <h1 style="color: #1b5e20; margin: 0; font-size: 24px;">⚒️ GoldForge</h1>
                         <p style="color: #616161; margin: 6px 0 0; font-size: 15px;">Resumo Financeiro Mensal • <strong>%s</strong></p>
                     </div>
 
@@ -257,7 +257,7 @@ public class EmailService {
 
                     <!-- FOOTER -->
                     <div style="margin-top: 35px; padding-top: 16px; border-top: 1px solid #eeeeee; text-align: center; font-size: 12px; color: #9e9e9e;">
-                        <p style="margin: 0;">Lembrete automático gerado pelo seu <strong>Finance App</strong>.</p>
+                        <p style="margin: 0;">Lembrete automático gerado pelo seu <strong>GoldForge</strong>.</p>
                         <p style="margin: 4px 0 0;">Mantenha o seu planejamento em dia! 🚀</p>
                     </div>
                 </div>
@@ -268,7 +268,7 @@ public class EmailService {
                 billRows.toString()
         );
 
-        sendHtmlEmail(toEmail, "Alerta de Contas a Vencer - Finance App", htmlContent);
+        sendHtmlEmail(toEmail, "Alerta de Contas a Vencer - GoldForge", htmlContent);
     }
 
     private String formatDueStatus(long dueInDays) {

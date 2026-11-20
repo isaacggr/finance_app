@@ -861,4 +861,37 @@ class ContractHygieneIntegrationTest extends AbstractWebIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, org.hamcrest.Matchers.startsWith("Bearer")));
     }
+
+    @Test
+    @DisplayName("Garante que HttpMessageNotReadableException extrai o nome do campo inválido de forma amigável e segura")
+    void shouldReturnFriendlyMessageOnMalformedFieldInput() throws Exception {
+        String invalidJson = """
+                {
+                    "amount": "nao-e-numero",
+                    "type": "EXPENSE",
+                    "category": "ALIMENTACAO",
+                    "date": "2026-11-20"
+                }
+                """;
+
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("O campo 'amount' possui um formato inválido ou incompatível"));
+    }
+
+    @Test
+    @DisplayName("Garante mensagem padrão segura quando o JSON não puder ser lido")
+    void shouldReturnDefaultMessageOnMalformedJsonBody() throws Exception {
+        mockMvc.perform(post("/transactions")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ json-quebrado: "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Corpo da requisição inválido ou com valores mal formatados"));
+    }
 }

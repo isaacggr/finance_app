@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -31,9 +32,54 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex) {
+        String message = "Corpo da requisição inválido ou com valores mal formatados";
+
+        String fieldName = extractInvalidFieldName(ex);
+        if (fieldName != null) {
+            message = "O campo '" + fieldName + "' possui um formato inválido ou incompatível";
+        }
+
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse(400, "Corpo da requisição inválido ou com valores mal formatados"));
+                .body(new ErrorResponse(400, message));
+    }
+
+    private String extractInvalidFieldName(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            try {
+                // Suporta Jackson 3 (tools.jackson) e Jackson 2 (com.fasterxml.jackson)
+                java.lang.reflect.Method getPathMethod = current.getClass().getMethod("getPath");
+                Object pathObj = getPathMethod.invoke(current);
+                if (pathObj instanceof List<?> list && !list.isEmpty()) {
+                    Object lastRef = list.get(list.size() - 1);
+                    String fieldName = null;
+                    try {
+                        // Jackson 3 usa getPropertyName()
+                        java.lang.reflect.Method getPropMethod = lastRef.getClass().getMethod("getPropertyName");
+                        Object res = getPropMethod.invoke(lastRef);
+                        if (res instanceof String s && !s.isBlank()) {
+                            fieldName = s;
+                        }
+                    } catch (NoSuchMethodException e) {
+                        // Jackson 2 usa getFieldName()
+                        java.lang.reflect.Method getFieldMethod = lastRef.getClass().getMethod("getFieldName");
+                        Object res = getFieldMethod.invoke(lastRef);
+                        if (res instanceof String s && !s.isBlank()) {
+                            fieldName = s;
+                        }
+                    }
+
+                    if (fieldName != null && !fieldName.isBlank()) {
+                        return fieldName;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Continua navegando na cadeia de causas
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     @ExceptionHandler(NotFoundException.class)
