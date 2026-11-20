@@ -2,7 +2,8 @@
 .gitignore
 .env
 *.log
-target/
+target/*
+!target/*.jar
 .idea/
 .vscode/
 HELP.md

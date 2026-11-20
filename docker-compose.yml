@@ -41,4 +41,5 @@ services:
 
 volumes:
   goldforge_mysql_data:
-    driver: local
+    name: finance_app_finance_mysql_data
+    external: true
