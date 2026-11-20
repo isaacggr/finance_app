@@ -30,6 +30,8 @@ spring:
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:noreply@goldforge.com.br}
+    sender-name: ${MAIL_SENDER_NAME:GoldForge}
     properties:
       mail:
         smtp:

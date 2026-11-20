@@ -30,8 +30,11 @@ public class EmailService {
     @Value("${app.url:http://localhost:8080}")
     private String appUrl;
 
-    @Value("${spring.mail.username:noreply@financeapp.com}")
+    @Value("${app.mail.from:${spring.mail.from:noreply@goldforge.com.br}}")
     private String fromEmail;
+
+    @Value("${app.mail.sender-name:${spring.mail.sender-name:GoldForge}}")
+    private String senderName;
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
@@ -45,7 +48,7 @@ public class EmailService {
         String safeCode = HtmlUtils.htmlEscape(code != null ? code : "");
         String htmlContent = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                    <h2 style="color: #2e7d32; text-align: center;">Bem-vindo ao Finance App, %s! 💰</h2>
+                    <h2 style="color: #2e7d32; text-align: center;">Bem-vindo ao GoldForge, %s! ⚒️</h2>
                     <p>Falta apenas um passo para começar a gerenciar suas finanças com inteligência.</p>
                     <p>Seu código de ativação de conta é:</p>
                     <div style="text-align: center; margin: 25px 0;">
@@ -290,15 +293,17 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            String sender = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@goldforge.com";
-            helper.setFrom(sender);
+            String sender = (fromEmail != null && !fromEmail.isBlank()) ? fromEmail : "noreply@goldforge.com.br";
+            String name = (senderName != null && !senderName.isBlank()) ? senderName : "GoldForge";
+
+            helper.setFrom(sender, name);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
             log.info("E-mail enviado com sucesso para {}", maskEmail(to));
-        } catch (MessagingException | RuntimeException ex) {
+        } catch (MessagingException | java.io.UnsupportedEncodingException | RuntimeException ex) {
             log.error("Falha ao enviar e-mail para {} ({}): {}", maskEmail(to), ex.getClass().getSimpleName(), ex.getMessage());
         }
     }
